@@ -6,23 +6,35 @@ export default function SignUpPage() {
     username: "",
     password: "",
     confirmPassword: "",
-    nickname: ""
+    nickname: "",
+    email: ""
   });
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (form.password !== form.confirmPassword) {
-      alert("비밀번호가 일치하지 않습니다.");
-      return;
+    try{
+        const res = await fetch("http://localhost:8080/api/users/join", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(form),
+        });
+        const data = await res.json();
+        if (res.ok){
+            alert("회원가입 성공");
+        } else{
+            alert("회원가입 실패: ${data.message}");
+        }
+    } catch (err){
+        console.error(err);
+        alert("회원가입 중 오류 발생");
     }
-
     console.log("회원가입 데이터:", form);
-    // 여기에 API 요청 코드 추가 가능
   };
 
   return (
@@ -77,6 +89,18 @@ export default function SignUpPage() {
               className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
+          </div>
+          <div>
+              <label className="block text-sm front-medium text-gray-700">이메일</label>
+              <input
+                type="text"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="이메일을 입력하세요"
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
           </div>
           <button
             type="submit"
