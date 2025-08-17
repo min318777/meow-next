@@ -3,10 +3,10 @@ import { useState } from "react";
 
 export default function SignUpPage() {
   const [form, setForm] = useState({
-    username: "",
+    loginId: "",
     password: "",
-    confirmPassword: "",
-    nickname: "",
+    passwordConfirm: "",
+    name: "",
     email: ""
   });
 
@@ -46,8 +46,8 @@ export default function SignUpPage() {
             <label className="block text-sm font-medium text-gray-700">아이디</label>
             <input
               type="text"
-              name="username"
-              value={form.username}
+              name="loginId"
+              value={form.loginId}
               onChange={handleChange}
               placeholder="아이디를 입력하세요"
               className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -70,8 +70,8 @@ export default function SignUpPage() {
             <label className="block text-sm font-medium text-gray-700">비밀번호 확인</label>
             <input
               type="password"
-              name="confirmPassword"
-              value={form.confirmPassword}
+              name="passwordConfirm"
+              value={form.passwordConfirm}
               onChange={handleChange}
               placeholder="비밀번호를 다시 입력하세요"
               className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -79,13 +79,13 @@ export default function SignUpPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">닉네임</label>
+            <label className="block text-sm font-medium text-gray-700">이름</label>
             <input
               type="text"
-              name="nickname"
-              value={form.nickname}
+              name="name"
+              value={form.name}
               onChange={handleChange}
-              placeholder="닉네임을 입력하세요"
+              placeholder="이름을 입력하세요"
               className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />

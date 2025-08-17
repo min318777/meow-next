@@ -1,28 +1,32 @@
+import { useRouter } from "next/navigation";
 import { Heart } from 'lucide-react';
 
 const PostCard = ({ post, onLike }) => {
+  const router = useRouter();
+
   return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 overflow-hidden">
+    <div
+      onClick={() => router.push(`/boast/${post.id}`)} // 클릭 시 이동
+      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 overflow-hidden cursor-pointer"
+    >
       <div className="relative">
-        <img src={post.image} alt={post.title} className="w-full h-48 object-cover" />
-        <div className="absolute top-3 right-3">
-          <span className="bg-black bg-opacity-50 text-white px-2 py-1 rounded-full text-xs">{post.category}</span>
-        </div>
+        <img src={post.catImageUrl || "/default-cat.png"} alt={post.title} className="w-full h-48 object-cover" />
       </div>
       <div className="p-4">
-        <h3 className="font-bold text-lg mb-2 text-gray-800 hover:text-blue-600 cursor-pointer transition-colors">
+        <h3 className="font-bold text-lg mb-2 text-gray-800 hover:text-blue-600 transition-colors">
           {post.title}
         </h3>
-        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{post.description}</p>
+        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{post.content}</p>
         <div className="flex items-center justify-between text-sm text-gray-500">
-          <div className="flex items-center space-x-2">
-            <span className="font-medium">{post.author}</span>
-            <span>•</span>
-            <span>{post.date}</span>
-          </div>
+          <span className="font-medium">{post.loginId}</span>
           <div className="flex items-center space-x-4">
-            <button onClick={() => onLike(post.id)}
-              className={`flex items-center space-x-1 transition-colors ${post.isLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); // 카드 이동 방지
+                onLike(post.id);
+              }}
+              className={`flex items-center space-x-1 transition-colors ${post.isLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
+            >
               <Heart className={`w-4 h-4 ${post.isLiked ? 'fill-current' : ''}`} />
               <span>{post.likes}</span>
             </button>

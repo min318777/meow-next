@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: '냥냥커뮤니티',
+  title: 'meow',
   description: '고양이를 사랑하는 모든 분들을 위한 커뮤니티',
 };
 

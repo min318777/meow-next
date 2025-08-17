@@ -1,22 +1,46 @@
 "use client";
+import { useState, useEffect } from "react";
 import { Search, User, Menu, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from "next/link";
 
-const Header = ({ isMenuOpen, setIsMenuOpen, isLoggedIn, setIsLoggedIn }) => {
+
+const Header = ({ isMenuOpen, setIsMenuOpen }) => {
     const router = useRouter();
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [userId, setUserId] = useState(null);
+    useEffect(() => {
+        const token = localStorage.getItem("accessToken");
+        const loginId = localStorage.getItem("loginId");
+        if(token && loginId) {
+            setIsLoggedIn(true);
+            setUserId(loginId);
+        }
+    }, []);
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
+
           {/* 로고 */}
-          <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-blue-600">🐱 meow</h1>
-          </div>
+          <Link href="/" className="flex items-center">
+            <h1 className="text-2xl font-bold text-blue-600 cursor-pointer">🐱 meow</h1>
+          </Link>
 
           {/* 데스크톱 네비게이션 */}
           <nav className="hidden md:flex items-center space-x-8">
-            <a href="#" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">고양이 자랑</a>
-            <a href="#" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">고양이 찾기</a>
+            <button
+                                        onClick={() => router.push("/boast")} // 게시글 조회 페이지로 이동
+                                        className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
+                                    >
+                                        고양이 자랑
+                                    </button>
+                                    <button
+                                        onClick={() => router.push("/find")} // 고양이 찾기 페이지로 이동
+                                        className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
+                                    >
+                                        고양이 찾기
+                                    </button>
             <div className="flex items-center space-x-2">
               <Search className="w-5 h-5 text-gray-400" />
               <input type="text" placeholder="검색..."
@@ -31,7 +55,7 @@ const Header = ({ isMenuOpen, setIsMenuOpen, isLoggedIn, setIsLoggedIn }) => {
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-2">
                   <User className="w-5 h-5 text-gray-600" />
-                  <span className="text-gray-700">냥집사님</span>
+                  <span className="text-gray-700">{userId}님</span>
                 </div>
                 <button onClick={() => setIsLoggedIn(false)}
                   className="text-gray-600 hover:text-gray-800 transition-colors">
@@ -40,7 +64,8 @@ const Header = ({ isMenuOpen, setIsMenuOpen, isLoggedIn, setIsLoggedIn }) => {
               </div>
             ) : (
               <>
-                <button onClick={() => setIsLoggedIn(true)}
+                <button
+                onClick={() => router.push("/signin")} // 로그인페이지로 이동
                   className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
                   로그인
                 </button>
