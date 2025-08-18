@@ -5,7 +5,7 @@ import Header from "../../components/Header";
 
 export default function BoastDetailPage() {
   const params = useParams();
-  const id = Number(params.id); // string → number
+  const id = Number(params.id);
   const [post, setPost] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -14,7 +14,6 @@ export default function BoastDetailPage() {
 
     const fetchDetail = async () => {
       try {
-        console.log(id);
         const res = await fetch(`http://localhost:8080/api/meow/boast-cat/${id}`, {
           method: "GET",
           headers: {

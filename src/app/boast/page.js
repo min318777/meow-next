@@ -4,39 +4,42 @@ import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import PostCard from "../components/PostCard";
 
-
 export default function BoastPage() {
   const [posts, setPosts] = useState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0); // 현재 페이지 (0부터 시작)
+  const [totalPages, setTotalPages] = useState(1);
   const router = useRouter();
 
   useEffect(() => {
-
     const accessToken = localStorage.getItem("accessToken");
 
     const fetchPosts = async () => {
       try {
-        const res = await fetch("http://localhost:8080/api/meow/boast-cat", {
-
-          method: "GET",
-          headers: {
+        const res = await fetch(
+          `http://localhost:8080/api/meow/boast-cat?page=${currentPage}&size=6`, // size=6개씩
+          {
+            method: "GET",
+            headers: {
               "Content-type": "application/json",
               Authorization: `Bearer ${accessToken}`,
-              },
-          credentials: "include", // 필요시
-        });
+            },
+            credentials: "include",
+          }
+        );
 
-        if (!res.ok){
-            throw new Error("서버 오류: ${res.status}");
-            }
+        if (!res.ok) {
+          throw new Error(`서버 오류: ${res.status}`);
+        }
         const data = await res.json();
         setPosts(data.data.content || []);
+        setTotalPages(data.data.totalPages || 1);
       } catch (err) {
         console.error("게시물 조회 실패:", err);
       }
     };
     fetchPosts();
-  }, []);
+  }, [currentPage]); // currentPage 바뀌면 다시 호출
 
   return (
     <div>
@@ -56,16 +59,34 @@ export default function BoastPage() {
         {posts.length === 0 ? (
           <p className="text-gray-500">등록된 게시물이 없습니다.</p>
         ) : (
-          <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                onLike={(postId) => console.log("좋아요 클릭", postId)}
-              />
-            ))}
-          </ul>
+          <>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  onLike={(postId) => console.log("좋아요 클릭", postId)}
+                />
+              ))}
+            </ul>
 
+            {/* 페이지네이션 */}
+            <div className="flex justify-center mt-8 space-x-2">
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(i)}
+                  className={`px-3 py-1 rounded-lg ${
+                    i === currentPage
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </main>
     </div>
