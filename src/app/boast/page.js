@@ -5,19 +5,22 @@ import Header from "../components/Header";
 import PostCard from "../components/PostCard";
 
 export default function BoastPage() {
-  const [posts, setPosts] = useState([]);
+  const [allPosts, setAllPosts] = useState([]); // 전체 게시물
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(0); // 현재 페이지 (0부터 시작)
-  const [totalPages, setTotalPages] = useState(1);
   const router = useRouter();
 
+  const postsPerPage = 10; // 페이지당 게시물 수
+
+  // 전체 게시물 가져오기
   useEffect(() => {
     const accessToken = localStorage.getItem("accessToken");
 
-    const fetchPosts = async () => {
+    const fetchAllPosts = async () => {
       try {
+        // 백엔드가 페이징을 제대로 안 하므로 size를 크게 설정해서 모든 데이터 가져오기
         const res = await fetch(
-          `http://localhost:8080/api/meow/boast-cat?page=${currentPage}&size=6`, // size=6개씩
+          `http://localhost:8080/api/meow/boast-cat?page=0&size=1000`,
           {
             method: "GET",
             headers: {
@@ -32,14 +35,43 @@ export default function BoastPage() {
           throw new Error(`서버 오류: ${res.status}`);
         }
         const data = await res.json();
-        setPosts(data.data.content || []);
-        setTotalPages(data.data.totalPages || 1);
+        console.log("API 응답 데이터:", data.data);
+        console.log("전체 게시물 수:", data.data.content?.length);
+
+        setAllPosts(data.data.content || []);
       } catch (err) {
         console.error("게시물 조회 실패:", err);
       }
     };
-    fetchPosts();
-  }, [currentPage]); // currentPage 바뀌면 다시 호출
+    fetchAllPosts();
+
+    // 페이지가 다시 보일 때마다 데이터 새로고침
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log("페이지가 다시 활성화됨 - 데이터 새로고침");
+        fetchAllPosts();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []); // 마운트될 때만 이벤트 리스너 등록
+
+  // 현재 페이지에 표시할 게시물 계산
+  /*2. 프론트엔드에서 페이징 처리
+      const startIndex = currentPage * 10; // 0, 10, 20, ...
+      const endIndex = startIndex + 10;    // 10, 20, 30, ...
+      const currentPosts = allPosts.slice(startIndex, endIndex);
+    */
+  const totalPages = Math.ceil(allPosts.length / postsPerPage);
+  const startIndex = currentPage * postsPerPage;
+  const endIndex = startIndex + postsPerPage;
+  const currentPosts = allPosts.slice(startIndex, endIndex);
+
+  console.log(`현재 페이지: ${currentPage + 1}, 표시할 게시물: ${startIndex}-${endIndex - 1} (총 ${currentPosts.length}개)`);
 
   return (
     <div>
@@ -51,17 +83,17 @@ export default function BoastPage() {
           <button
             onClick={() => router.push("/create-boast")}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
+            >
             글 등록
           </button>
         </div>
 
-        {posts.length === 0 ? (
+        {allPosts.length === 0 ? (
           <p className="text-gray-500">등록된 게시물이 없습니다.</p>
         ) : (
           <>
             <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {posts.map((post) => (
+              {currentPosts.map((post) => (
                 <PostCard
                   key={post.id}
                   post={post}
@@ -71,21 +103,50 @@ export default function BoastPage() {
             </ul>
 
             {/* 페이지네이션 */}
-            <div className="flex justify-center mt-8 space-x-2">
-              {Array.from({ length: totalPages }, (_, i) => (
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center mt-8 space-x-2">
+                {/* 이전 버튼 */}
                 <button
-                  key={i}
-                  onClick={() => setCurrentPage(i)}
-                  className={`px-3 py-1 rounded-lg ${
-                    i === currentPage
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
+                  onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                  disabled={currentPage === 0}
+                  className="px-3 py-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {i + 1}
+                  이전
                 </button>
-              ))}
-            </div>
+
+                {/* 페이지 번호 */}
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      console.log(`페이지 ${i + 1}로 이동`);
+                      setCurrentPage(i);
+                    }}
+                    className={`px-3 py-1 rounded-lg transition-colors ${
+                      i === currentPage
+                        ? "bg-blue-600 text-white font-semibold"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+
+                {/* 다음 버튼 */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                  disabled={currentPage === totalPages - 1}
+                  className="px-3 py-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  다음
+                </button>
+
+                {/* 페이지 정보 */}
+                <span className="ml-4 text-sm text-gray-500">
+                  {currentPage + 1} / {totalPages} 페이지
+                </span>
+              </div>
+            )}
           </>
         )}
       </main>

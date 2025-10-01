@@ -4,13 +4,27 @@ import { Heart } from 'lucide-react';
 const PostCard = ({ post, onLike }) => {
   const router = useRouter();
 
+  // 디버깅: 게시물 데이터 확인
+  console.log("PostCard 데이터:", {
+    id: post.id,
+    title: post.title,
+    view: post.view,
+    likes: post.likes,
+    commentList: post.commentDtoList,
+    imageUrls: post.imageUrls
+  });
+
   return (
     <div
       onClick={() => router.push(`/boast/${post.id}`)} // 클릭 시 이동
       className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 overflow-hidden cursor-pointer"
     >
       <div className="relative">
-        <img src={post.catImageUrl || "/default-cat.png"} alt={post.title} className="w-full h-48 object-cover" />
+        <img
+          src={post.imageUrls?.[0] || post.catImageUrl || "/default-cat.png"}
+          alt={post.title}
+          className="w-full h-48 object-cover"
+        />
       </div>
       <div className="p-4">
         <h3 className="font-bold text-lg mb-2 text-gray-800 hover:text-blue-600 transition-colors">
@@ -30,7 +44,8 @@ const PostCard = ({ post, onLike }) => {
               <Heart className={`w-4 h-4 ${post.isLiked ? 'fill-current' : ''}`} />
               <span>{post.likes}</span>
             </button>
-            <span className="text-gray-400">조회 {post.views}</span>
+            <span className="text-gray-400">조회 {post.view}</span>
+            <span className="text-gray-400">댓글 {post.commentDtoList?.length || 0}</span>
           </div>
         </div>
       </div>

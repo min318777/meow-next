@@ -1,0 +1,8 @@
+{
+  "outputStyle": "korean",
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)"
+    ]
+  }
+}

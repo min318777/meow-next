@@ -4,19 +4,50 @@ import { Search, User, Menu, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
 
-
 const Header = ({ isMenuOpen, setIsMenuOpen }) => {
-    const router = useRouter();
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [userId, setUserId] = useState(null);
-    useEffect(() => {
-        const token = localStorage.getItem("accessToken");
-        const loginId = localStorage.getItem("loginId");
-        if(token && loginId) {
-            setIsLoggedIn(true);
-            setUserId(loginId);
+      const router = useRouter();
+      const [searchQuery, setSearchQuery] = useState('');
+      const [isLoggedIn, setIsLoggedIn] = useState(false);
+      const [userId, setUserId] = useState('');
+      const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+      useEffect(() => {
+        const token = localStorage.getItem('accessToken');
+        const loginId = localStorage.getItem('loginId');
+        if (token && loginId) {
+          setIsLoggedIn(true);
+          setUserId(loginId);
         }
-    }, []);
+      }, []);
+
+      // 검색 기능
+      const handleSearch = (e) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+          router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+          setSearchQuery('');
+        }
+      };
+
+      // 로그아웃 처리
+      const handleLogout = async () => {
+        try {
+          const res = await fetch("http://localhost:8080/api/logout", {
+            method: "POST",
+            credentials: "include",
+          });
+          if (res.ok) {
+            setIsLoggedIn(false);
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("loginId");
+            router.push("/");
+          } else {
+            console.log("로그아웃 실패:", await res.text());
+          }
+        } catch (err) {
+          console.log("로그아웃 요청 실패:", err);
+        }
+      };
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -31,22 +62,28 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
           <nav className="hidden md:flex items-center space-x-8">
             <button
                                         onClick={() => router.push("/boast")} // 게시글 조회 페이지로 이동
-                                        className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
-                                    >
+                                        className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
                                         고양이 자랑
                                     </button>
                                     <button
                                         onClick={() => router.push("/find")} // 고양이 찾기 페이지로 이동
-                                        className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
-                                    >
+                                        className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
                                         고양이 찾기
                                     </button>
-            <div className="flex items-center space-x-2">
+            <form onSubmit={handleSearch} className="flex items-center space-x-2">
               <Search className="w-5 h-5 text-gray-400" />
-              <input type="text" placeholder="검색..."
+              <input
+                type="text"
+                placeholder="검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-1 rounded-lg hover:bg-blue-700 transition-colors"
+              >검색</button>
+            </form>
           </nav>
 
           {/* 로그인/회원가입 */}
@@ -57,7 +94,8 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
                   <User className="w-5 h-5 text-gray-600" />
                   <span className="text-gray-700">{userId}님</span>
                 </div>
-                <button onClick={() => setIsLoggedIn(false)}
+                <button
+                  onClick={handleLogout}
                   className="text-gray-600 hover:text-gray-800 transition-colors">
                   로그아웃
                 </button>
@@ -65,13 +103,13 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
             ) : (
               <>
                 <button
-                onClick={() => router.push("/signin")} // 로그인페이지로 이동
+                  onClick={() => router.push("/signin")}
                   className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
                   로그인
                 </button>
                 <button
-                onClick={() => router.push("/signup")} // 회원가입 페이지로 이동
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                  onClick={() => router.push("/signup")}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
                   회원가입
                 </button>
               </>
@@ -91,21 +129,66 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
       {isMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-200">
           <div className="px-4 py-3 space-y-3">
-            <a href="#" className="block text-gray-700 hover:text-blue-600 font-medium">고양이 자랑</a>
-            <a href="#" className="block text-gray-700 hover:text-blue-600 font-medium">고양이 찾기</a>
-            <div className="flex items-center space-x-2 pt-2">
+            <button
+              onClick={() => {
+                router.push("/boast");
+                setIsMenuOpen(false);
+              }}
+              className="block w-full text-left text-gray-700 hover:text-blue-600 font-medium">
+              고양이 자랑
+            </button>
+            <button
+              onClick={() => {
+                router.push("/find");
+                setIsMenuOpen(false);
+              }}
+              className="block w-full text-left text-gray-700 hover:text-blue-600 font-medium">
+              고양이 찾기
+            </button>
+            <form onSubmit={handleSearch} className="flex items-center space-x-2 pt-2">
               <Search className="w-5 h-5 text-gray-400" />
-              <input type="text" placeholder="검색..."
+              <input
+                type="text"
+                placeholder="검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-            {!isLoggedIn && (
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-1 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                검색
+              </button>
+            </form>
+            {isLoggedIn ? (
+              <div className="flex items-center justify-between pt-3">
+                <div className="flex items-center space-x-2">
+                  <User className="w-5 h-5 text-gray-600" />
+                  <span className="text-gray-700">{userId}님</span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="text-gray-600 hover:text-gray-800 transition-colors">
+                  로그아웃
+                </button>
+              </div>
+            ) : (
               <div className="flex space-x-3 pt-3">
-                <button onClick={() => setIsLoggedIn(true)}
+                <button
+                  onClick={() => {
+                    router.push("/signin");
+                    setIsMenuOpen(false);
+                  }}
                   className="flex-1 text-center text-gray-700 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
                   로그인
                 </button>
-                <button className="flex-1 text-center bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                <button
+                  onClick={() => {
+                    router.push("/signup");
+                    setIsMenuOpen(false);
+                  }}
+                  className="flex-1 text-center bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
                   회원가입
                 </button>
               </div>
