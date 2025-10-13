@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Header from "../components/Header";
 import { Search, AlertCircle } from "lucide-react";
+import { authPost } from "../utils/authFetch";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
@@ -28,9 +29,6 @@ export default function SearchPage() {
       setError(null);
 
       try {
-        // localStorage에서 액세스 토큰 가져오기
-        const accessToken = localStorage.getItem("accessToken");
-
         // PostSearchRequest 형식에 맞춰 요청 본문 구성
         const requestBody = {
           title: query,      // 제목에서 검색
@@ -40,29 +38,12 @@ export default function SearchPage() {
           userId: null
         };
 
-        const res = await fetch(
+        // authPost 함수를 사용하여 자동 토큰 재발급 적용
+        const data = await authPost(
           `http://localhost:8080/api/meow/search?page=${currentPage}&size=10`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`, // 인증 토큰 추가
-            },
-            body: JSON.stringify(requestBody),
-            credentials: "include", // 쿠키 포함
-          }
+          requestBody
         );
 
-        console.log("응답 상태:", res.status);
-        console.log("응답 헤더:", res.headers);
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("서버 에러 응답:", errorText);
-          throw new Error(`검색 요청 실패: ${res.status} - ${errorText}`);
-        }
-
-        const data = await res.json();
         console.log("서버 응답 데이터:", data);
 
         // ApiResponse<Page<PostDto>> 형식 처리

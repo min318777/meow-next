@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "./components/Header";
 import Banner from "./components/Banner";
 import PostCard from "./components/PostCard";
@@ -7,33 +7,73 @@ import PostCard from "./components/PostCard";
 export default function Page() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [posts, setPosts] = useState([
-    {
-      id: 1,
-      title: "우리 집 털뭉치 나비의 하루 🦋",
-      description: "햇살 받은 나비의 모습이 너무 예뻐서 찍었어요.",
-      image: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=400&h=300&fit=crop",
-      author: "냥집사1",
-      date: "2024-08-13",
-      likes: 24,
-      views: 156,
-      isLiked: false,
-      category: "고양이 자랑"
-    },
-    {
-      id: 2,
-      title: "길고양이를 발견했어요! 😿",
-      description: "강남에서 발견한 회색 고양이입니다. 주인을 찾습니다.",
-      image: "https://images.unsplash.com/photo-1513245543132-31f507417b26?w=400&h=300&fit=crop",
-      author: "동물사랑",
-      date: "2024-08-12",
-      likes: 45,
-      views: 289,
-      isLiked: true,
-      category: "고양이 찾기"
-    }
-  ]);
+  // 최근 게시글 가져오기 (고양이 자랑 + 고양이 찾기)
+  useEffect(() => {
+    const fetchRecentPosts = async () => {
+      setLoading(true);
+      try {
+        // localStorage에서 토큰 가져오기
+        const accessToken = localStorage.getItem("accessToken");
+
+        // 두 개의 API를 병렬로 호출 (고양이 자랑, 고양이 찾기)
+        const [boastRes, lostRes] = await Promise.all([
+          fetch("http://localhost:8080/api/meow/boast-cat?page=0&size=1000", {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            credentials: "include",
+          }),
+          fetch("http://localhost:8080/api/meow/lost-cat?page=0&size=1000", {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            credentials: "include",
+          }),
+        ]);
+
+        // 응답 데이터 파싱
+        const boastData = boastRes.ok ? await boastRes.json() : { data: { content: [] } };
+        const lostData = lostRes.ok ? await lostRes.json() : { data: { content: [] } };
+
+        // 두 배열 합치기 및 카테고리 정보 추가
+        const boastPosts = (boastData.data?.content || []).map(post => ({
+          ...post,
+          category: "고양이 자랑",
+          basePath: "/boast"
+        }));
+
+        const lostPosts = (lostData.data?.content || []).map(post => ({
+          ...post,
+          category: "고양이 찾기",
+          basePath: "/lost"
+        }));
+
+        // 합친 후 생성일자(createdAt) 기준 내림차순 정렬 (최신순)
+        const allPosts = [...boastPosts, ...lostPosts].sort((a, b) => {
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+
+        // 최신 6개만 표시
+        setPosts(allPosts.slice(0, 6));
+
+        console.log("전체 게시글 수:", allPosts.length);
+        console.log("표시할 최근 게시글:", allPosts.slice(0, 6));
+      } catch (error) {
+        console.error("게시글 조회 실패:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecentPosts();
+  }, []);
 
   const handleLike = (id) => {
     setPosts(prev =>
@@ -52,11 +92,30 @@ export default function Page() {
         <Banner />
         <section className="px-4 pb-12">
           <h2 className="text-2xl font-bold mb-6">최근 게시글</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {posts.map(post => (
-              <PostCard key={post.id} post={post} onLike={handleLike} />
-            ))}
-          </div>
+
+          {/* 로딩 상태 */}
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+          ) : posts.length === 0 ? (
+            // 게시글 없음
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-lg">아직 등록된 게시글이 없습니다.</p>
+            </div>
+          ) : (
+            // 게시글 목록
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {posts.map(post => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  basePath={post.basePath}
+                  onLike={handleLike}
+                />
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>

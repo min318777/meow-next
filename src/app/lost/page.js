@@ -3,9 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import PostCard from "../components/PostCard";
-import { authGet } from "../utils/authFetch";
 
-export default function BoastPage() {
+export default function LostPage() {
   const [allPosts, setAllPosts] = useState([]); // 전체 게시물
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(0); // 현재 페이지 (0부터 시작)
@@ -15,21 +14,33 @@ export default function BoastPage() {
 
   // 전체 게시물 가져오기
   useEffect(() => {
+    const accessToken = localStorage.getItem("accessToken");
+
     const fetchAllPosts = async () => {
       try {
-        // authGet 함수를 사용하여 자동 토큰 재발급 적용
         // 백엔드가 페이징을 제대로 안 하므로 size를 크게 설정해서 모든 데이터 가져오기
-        const data = await authGet(
-          `http://localhost:8080/api/meow/boast-cat?page=0&size=1000`
+        const res = await fetch(
+          `http://localhost:8080/api/meow/lost-cat?page=0&size=1000`,
+          {
+            method: "GET",
+            headers: {
+              "Content-type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            credentials: "include",
+          }
         );
 
+        if (!res.ok) {
+          throw new Error(`서버 오류: ${res.status}`);
+        }
+        const data = await res.json();
         console.log("API 응답 데이터:", data.data);
         console.log("전체 게시물 수:", data.data.content?.length);
 
         setAllPosts(data.data.content || []);
       } catch (err) {
         console.error("게시물 조회 실패:", err);
-        // authGet에서 이미 로그인 페이지로 리다이렉트 처리됨
       }
     };
     fetchAllPosts();
@@ -68,9 +79,9 @@ export default function BoastPage() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">고양이 자랑 게시물</h2>
+          <h2 className="text-2xl font-bold">고양이 찾기 게시물</h2>
           <button
-            onClick={() => router.push("/create-boast")}
+            onClick={() => router.push("/create-lost")}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
             >
             글 등록
@@ -86,6 +97,7 @@ export default function BoastPage() {
                 <PostCard
                   key={post.id}
                   post={post}
+                  basePath="/lost"
                   onLike={(postId) => console.log("좋아요 클릭", postId)}
                 />
               ))}

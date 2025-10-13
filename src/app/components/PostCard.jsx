@@ -1,7 +1,7 @@
 import { useRouter } from "next/navigation";
 import { Heart } from 'lucide-react';
 
-const PostCard = ({ post, onLike }) => {
+const PostCard = ({ post, onLike, basePath = "/boast" }) => {
   const router = useRouter();
 
   // 디버깅: 게시물 데이터 확인
@@ -16,7 +16,7 @@ const PostCard = ({ post, onLike }) => {
 
   return (
     <div
-      onClick={() => router.push(`/boast/${post.id}`)} // 클릭 시 이동
+      onClick={() => router.push(`${basePath}/${post.id}`)} // 클릭 시 동적 경로로 이동
       className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 overflow-hidden cursor-pointer"
     >
       <div className="relative">

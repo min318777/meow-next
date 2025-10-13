@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
+import { authPostFormData } from "../utils/authFetch";
 
 export default function CreateBoastCatPostPage() {
   const router = useRouter();
@@ -28,8 +29,7 @@ export default function CreateBoastCatPostPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const accessToken = localStorage.getItem("accessToken");
-
+      // FormData 생성
       const formData = new FormData();
       formData.append("title", form.title);
       formData.append("content", form.content);
@@ -37,18 +37,13 @@ export default function CreateBoastCatPostPage() {
         formData.append("images", file); // 서버에서 images[]로 받기
       });
 
-      const res = await fetch("http://localhost:8080/api/meow/boast-cat", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          // Content-Type은 FormData일 경우 브라우저가 자동 설정
-        },
-        body: formData,
-      });
+      // authPostFormData 함수를 사용하여 자동 토큰 재발급 적용
+      const data = await authPostFormData(
+        "http://localhost:8080/api/meow/boast-cat",
+        formData
+      );
 
-      const data = await res.json();
-
-      if (res.ok) {
+      if (data.status === "OK") {
         alert("고양이 자랑글 등록 완료!");
         router.push("/boast");
       } else {

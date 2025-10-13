@@ -66,7 +66,7 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
                                         고양이 자랑
                                     </button>
                                     <button
-                                        onClick={() => router.push("/find")} // 고양이 찾기 페이지로 이동
+                                        onClick={() => router.push("/lost")} // 고양이 찾기 페이지로 이동
                                         className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
                                         고양이 찾기
                                     </button>
@@ -139,7 +139,7 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
             </button>
             <button
               onClick={() => {
-                router.push("/find");
+                router.push("/lost");
                 setIsMenuOpen(false);
               }}
               className="block w-full text-left text-gray-700 hover:text-blue-600 font-medium">

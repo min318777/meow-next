@@ -1,8 +1,10 @@
 {
-  "outputStyle": "korean",
   "permissions": {
     "allow": [
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm run dev:*)",
+      "Bash(taskkill:*)"
     ]
-  }
+  },
+  "outputStyle": "korean"
 }
