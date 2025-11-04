@@ -4,6 +4,35 @@ import { useParams } from "next/navigation";
 import Header from "../../components/Header";
 import { publicGet, authPost } from "../../utils/authFetch";
 
+// 카카오맵 스크립트를 동적으로 로드하는 함수
+const loadKakaoMapScript = () => {
+  return new Promise((resolve, reject) => {
+    // 이미 스크립트가 로드되었는지 확인
+    if (window.kakao && window.kakao.maps) {
+      resolve();
+      return;
+    }
+
+    // 스크립트 태그 생성
+    const script = document.createElement("script");
+    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&autoload=false`;
+    script.async = true;
+
+    script.onload = () => {
+      // 카카오맵 SDK가 로드되면 maps 라이브러리 초기화
+      window.kakao.maps.load(() => {
+        resolve();
+      });
+    };
+
+    script.onerror = () => {
+      reject(new Error("카카오맵 스크립트 로드 실패"));
+    };
+
+    document.head.appendChild(script);
+  });
+};
+
 export default function LostDetailPage() {
   const params = useParams();
   const id = Number(params.id);
@@ -17,6 +46,10 @@ export default function LostDetailPage() {
   const [currentCommentPage, setCurrentCommentPage] = useState(1); // 댓글 페이지 (1부터 시작)
   const commentsPerPage = 5; // 페이지당 댓글 수
   const hasFetchedRef = useRef(false); // API 호출 여부 추적
+
+  // 카카오맵 관련 상태 및 ref
+  const mapContainerRef = useRef(null); // 지도를 표시할 DOM 요소
+  const [isMapLoaded, setIsMapLoaded] = useState(false); // 지도 로딩 상태
 
   // 댓글 목록을 가져오는 함수
   const fetchComments = async () => {
@@ -107,6 +140,63 @@ export default function LostDetailPage() {
     fetchDetail();
     fetchComments(); // 페이지 로드 시 댓글도 함께 불러오기
   }, [id]);
+
+  // 카카오맵 초기화 useEffect
+  useEffect(() => {
+    // 게시물 데이터가 로드되고, 위도/경도가 있을 때만 지도 초기화
+    if (!post || !post.latitude || !post.longitude) {
+      return;
+    }
+
+    const initializeMap = async () => {
+      try {
+        // 카카오맵 스크립트 로드
+        await loadKakaoMapScript();
+
+        // 지도 컨테이너가 존재하는지 확인
+        if (!mapContainerRef.current) {
+          console.error("지도 컨테이너를 찾을 수 없습니다.");
+          return;
+        }
+
+        // 지도 옵션 설정
+        const options = {
+          center: new window.kakao.maps.LatLng(post.latitude, post.longitude), // 실종 위치 좌표
+          level: 3, // 지도 확대 레벨 (1~14, 숫자가 작을수록 확대)
+        };
+
+        // 지도 생성
+        const map = new window.kakao.maps.Map(mapContainerRef.current, options);
+
+        // 마커 생성 (실종 위치 표시)
+        const markerPosition = new window.kakao.maps.LatLng(post.latitude, post.longitude);
+        const marker = new window.kakao.maps.Marker({
+          position: markerPosition,
+        });
+
+        // 마커를 지도에 표시
+        marker.setMap(map);
+
+        // 인포윈도우 생성 (마커 클릭 시 표시할 정보)
+        const infowindow = new window.kakao.maps.InfoWindow({
+          content: `<div style="padding:10px; font-size:14px; text-align:center; min-width:150px;">
+                      <strong>🐱 실종 위치</strong><br/>
+                      <span style="font-size:12px; color:#666;">${post.lostLocation || '실종 장소'}</span>
+                    </div>`,
+        });
+
+        // 마커에 인포윈도우 표시
+        infowindow.open(map, marker);
+
+        setIsMapLoaded(true);
+        console.log("카카오맵 초기화 완료");
+      } catch (error) {
+        console.error("카카오맵 초기화 실패:", error);
+      }
+    };
+
+    initializeMap();
+  }, [post]); // post 데이터가 변경될 때마다 지도 초기화
 
   if (!post) {
     return <p className="text-center mt-10">로딩 중...</p>;
@@ -221,35 +311,54 @@ export default function LostDetailPage() {
                 </div>
               )}
 
+              {/* 카카오맵 표시 영역 */}
               {(post.latitude && post.longitude) && (
                 <div className="bg-white rounded-lg p-4 shadow-sm">
-                  <div className="text-sm text-gray-500 mb-1 font-medium">GPS 좌표</div>
-                  <div className="text-lg font-semibold text-gray-800">
-                    위도: {post.latitude} / 경도: {post.longitude}
-                  </div>
-                  <a
-                    href={`https://www.google.com/maps?q=${post.latitude},${post.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium underline"
+                  <div className="text-sm text-gray-500 mb-3 font-medium">지도에서 보기</div>
+                  {/* 지도 컨테이너 */}
+                  <div
+                    ref={mapContainerRef}
+                    className="w-full h-64 md:h-96 rounded-lg overflow-hidden border border-gray-200"
+                    style={{ minHeight: '300px' }}
                   >
-                    구글 지도에서 보기 →
-                  </a>
+                    {/* 지도 로딩 중일 때 표시할 메시지 */}
+                    {!isMapLoaded && (
+                      <div className="flex items-center justify-center h-full bg-gray-100">
+                        <div className="text-center">
+                          <div className="text-4xl mb-2">🗺️</div>
+                          <p className="text-gray-600">지도를 불러오는 중...</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* 대표 이미지 */}
+        {/* 고양이 사진 갤러리 */}
         {post.imageUrls && post.imageUrls.length > 0 && (
           <div className="mb-10">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">고양이 사진</h3>
-            <img
-              src={post.imageUrls[0]}
-              alt="대표 이미지"
-              className="w-full h-96 object-cover rounded-xl shadow-lg"
-            />
+            <h3 className="text-xl font-bold text-gray-800 mb-4">
+              고양이 사진 ({post.imageUrls.length}장)
+            </h3>
+
+            {/* 모든 이미지를 동일한 크기의 그리드로 표시 */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {post.imageUrls.map((url, idx) => (
+                <img
+                  key={idx}
+                  src={url}
+                  alt={`고양이 사진 ${idx + 1}`}
+                  className="w-full h-64 object-cover rounded-lg shadow hover:shadow-xl transition-shadow cursor-pointer"
+                  onClick={() => {
+                    // 이미지 클릭 시 새 탭에서 원본 크기로 보기
+                    window.open(url, '_blank');
+                  }}
+                />
+              ))}
+            </div>
           </div>
         )}
 
@@ -259,23 +368,6 @@ export default function LostDetailPage() {
           <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
             <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">{post.contents}</p>
           </div>
-
-          {/* 추가 이미지들 */}
-          {post.imageUrls && post.imageUrls.slice(1).length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">추가 사진</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {post.imageUrls.slice(1).map((url, idx) => (
-                  <img
-                    key={idx}
-                    src={url}
-                    alt={`추가 이미지 ${idx + 1}`}
-                    className="w-full h-64 object-cover rounded-lg shadow"
-                  />
-                ))}
-              </div>
-            </div>
-          )}
         </article>
 
         {/* 댓글 섹션 */}

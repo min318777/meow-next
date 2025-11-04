@@ -41,9 +41,8 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
         </div>
 
         <div className="p-4">
-          {/* 고양이 이름 */}
           <h3 className="font-bold text-xl mb-2 text-gray-900 hover:text-blue-600 transition-colors">
-            {post.catName || post.title}
+            {post.title}
           </h3>
 
           {/* 실종 위치 */}
@@ -64,10 +63,6 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
             </div>
           )}
 
-          {/* 게시글 제목 (고양이 이름과 다른 경우) */}
-          {post.title !== post.catName && (
-            <p className="text-gray-600 text-sm mb-3 line-clamp-2">{post.title}</p>
-          )}
 
           {/* 하단 정보 */}
           <div className="flex items-center justify-between text-sm text-gray-500 pt-3 border-t border-gray-100">

@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import Header from "../components/Header";
-import { X } from "lucide-react"; // 이미지 삭제 아이콘
+import { X, MapPin, Navigation, Search } from "lucide-react"; // 아이콘 추가
 
 export default function CreateLostCatPostPage() {
   const router = useRouter();
@@ -22,6 +23,13 @@ export default function CreateLostCatPostPage() {
   const [files, setFiles] = useState([]); // 실제 File 객체 배열
   const [previewUrls, setPreviewUrls] = useState([]); // 미리보기 URL 배열
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showMap, setShowMap] = useState(false); // 지도 표시 여부
+  const [mapLoaded, setMapLoaded] = useState(false); // 카카오맵 API 로드 여부
+  const [searchAddress, setSearchAddress] = useState(""); // 주소 검색 입력값
+
+  const mapRef = useRef(null); // 지도 DOM 참조
+  const kakaoMapRef = useRef(null); // 카카오맵 인스턴스 참조
+  const markerRef = useRef(null); // 마커 참조
 
   // 컴포넌트 unmount 시 메모리 정리
   useEffect(() => {
@@ -63,6 +71,209 @@ export default function CreateLostCatPostPage() {
 
     setFiles(newFiles);
     setPreviewUrls(newPreviewUrls);
+  };
+
+  // 카카오맵 API 로드 완료 시 호출
+  const handleKakaoMapLoad = () => {
+    setMapLoaded(true);
+  };
+
+  // 마커 생성/업데이트 함수
+  const updateMarker = (lat, lng) => {
+    if (!kakaoMapRef.current) return;
+
+    const kakao = window.kakao;
+    const map = kakaoMapRef.current;
+    const latlng = new kakao.maps.LatLng(lat, lng);
+
+    // 기존 마커 제거
+    if (markerRef.current) {
+      markerRef.current.setMap(null);
+    }
+
+    // 새 마커 생성
+    const marker = new kakao.maps.Marker({
+      position: latlng,
+    });
+    marker.setMap(map);
+    markerRef.current = marker;
+
+    // 지도 중심 이동
+    map.setCenter(latlng);
+  };
+
+  // 지도 초기화 (지도를 열 때마다 호출)
+  const initializeMap = () => {
+    if (!mapLoaded || !mapRef.current || !window.kakao || !window.kakao.maps) {
+      return;
+    }
+
+    const kakao = window.kakao;
+
+    // 서울 시청을 기본 중심 좌표로 설정
+    const defaultLat = form.latitude || 37.5665;
+    const defaultLng = form.longitude || 126.9780;
+
+    const container = mapRef.current;
+    const options = {
+      center: new kakao.maps.LatLng(defaultLat, defaultLng),
+      level: 3, // 지도 확대 레벨
+    };
+
+    // 지도 생성
+    const map = new kakao.maps.Map(container, options);
+    kakaoMapRef.current = map;
+
+    // 기존 좌표가 있으면 마커 생성
+    if (form.latitude && form.longitude) {
+      updateMarker(parseFloat(form.latitude), parseFloat(form.longitude));
+    }
+
+    // 지도 클릭 이벤트
+    kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
+      const latlng = mouseEvent.latLng;
+      const lat = latlng.getLat();
+      const lng = latlng.getLng();
+
+      // 좌표를 폼에 저장
+      setForm(prev => ({
+        ...prev,
+        latitude: lat.toString(),
+        longitude: lng.toString(),
+      }));
+
+      // 마커 업데이트
+      updateMarker(lat, lng);
+
+      // 주소 검색 (Geocoder 사용)
+      const geocoder = new kakao.maps.services.Geocoder();
+      geocoder.coord2Address(lng, lat, function(result, status) {
+        if (status === kakao.maps.services.Status.OK && result[0]) {
+          const address = result[0].address.address_name || result[0].road_address?.address_name || '';
+          setForm(prev => ({
+            ...prev,
+            lostLocation: address,
+          }));
+        }
+      });
+    });
+  };
+
+  // 현재 위치 가져오기
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('이 브라우저는 위치 서비스를 지원하지 않습니다.');
+      return;
+    }
+
+    // 지도가 열려있지 않으면 먼저 열기
+    if (!showMap) {
+      setShowMap(true);
+      setTimeout(() => {
+        initializeMap();
+        // 지도 초기화 후 위치 가져오기
+        setTimeout(() => {
+          fetchCurrentPosition();
+        }, 200);
+      }, 100);
+    } else {
+      fetchCurrentPosition();
+    }
+  };
+
+  // 실제 위치 가져오기 함수
+  const fetchCurrentPosition = () => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        // 폼에 좌표 저장
+        setForm(prev => ({
+          ...prev,
+          latitude: lat.toString(),
+          longitude: lng.toString(),
+        }));
+
+        // 마커 업데이트
+        if (kakaoMapRef.current) {
+          updateMarker(lat, lng);
+
+          // 주소 변환
+          const kakao = window.kakao;
+          const geocoder = new kakao.maps.services.Geocoder();
+          geocoder.coord2Address(lng, lat, function(result, status) {
+            if (status === kakao.maps.services.Status.OK && result[0]) {
+              const address = result[0].address.address_name || result[0].road_address?.address_name || '';
+              setForm(prev => ({
+                ...prev,
+                lostLocation: address,
+              }));
+            }
+          });
+        }
+
+        alert('현재 위치로 설정되었습니다.');
+      },
+      (error) => {
+        console.error('위치 가져오기 오류:', error);
+        alert('현재 위치를 가져올 수 없습니다. 위치 권한을 확인해주세요.');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
+
+  // 주소 검색
+  const handleAddressSearch = () => {
+    if (!searchAddress.trim()) {
+      alert('검색할 주소를 입력해주세요.');
+      return;
+    }
+
+    if (!window.kakao || !window.kakao.maps) {
+      alert('지도를 먼저 열어주세요.');
+      return;
+    }
+
+    const kakao = window.kakao;
+    const geocoder = new kakao.maps.services.Geocoder();
+
+    geocoder.addressSearch(searchAddress, function(result, status) {
+      if (status === kakao.maps.services.Status.OK) {
+        const lat = parseFloat(result[0].y);
+        const lng = parseFloat(result[0].x);
+
+        // 폼에 좌표와 주소 저장
+        setForm(prev => ({
+          ...prev,
+          latitude: lat.toString(),
+          longitude: lng.toString(),
+          lostLocation: result[0].address_name || searchAddress,
+        }));
+
+        // 마커 업데이트
+        updateMarker(lat, lng);
+
+        setSearchAddress(''); // 검색창 초기화
+      } else {
+        alert('주소를 찾을 수 없습니다. 정확한 주소를 입력해주세요.');
+      }
+    });
+  };
+
+  // 지도 표시 토글
+  const toggleMap = () => {
+    setShowMap(!showMap);
+    // 지도를 열 때 초기화
+    if (!showMap) {
+      setTimeout(() => {
+        initializeMap();
+      }, 100); // DOM 렌더링 대기
+    }
   };
 
   // 제출
@@ -123,6 +334,17 @@ export default function CreateLostCatPostPage() {
 
   return (
     <div>
+      {/* 카카오맵 API 스크립트 로드 */}
+      <Script
+        src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&libraries=services&autoload=false`}
+        strategy="afterInteractive"
+        onLoad={() => {
+          window.kakao.maps.load(() => {
+            handleKakaoMapLoad();
+          });
+        }}
+      />
+
       <Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
 
       <main className="flex items-center justify-center min-h-screen bg-gray-50 py-12 px-4">
@@ -251,7 +473,70 @@ export default function CreateLostCatPostPage() {
 
             {/* 실종 위치 섹션 */}
             <div className="border-t pt-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">📍 실종 위치</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-800">📍 실종 위치</h3>
+                {/* 지도 표시 토글 버튼 */}
+                <button
+                  type="button"
+                  onClick={toggleMap}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
+                >
+                  <MapPin size={18} />
+                  {showMap ? '지도 숨기기' : '지도에서 선택'}
+                </button>
+              </div>
+
+              {/* 카카오맵 */}
+              {showMap && (
+                <div className="mb-4 space-y-4">
+                  {/* 지도 컨트롤 - 주소 검색 및 현재 위치 */}
+                  <div className="flex gap-2">
+                    {/* 주소 검색 */}
+                    <div className="flex-1 flex gap-2">
+                      <input
+                        type="text"
+                        value={searchAddress}
+                        onChange={(e) => setSearchAddress(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddressSearch();
+                          }
+                        }}
+                        placeholder="주소로 검색 (예: 서울시 강남구)"
+                        className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddressSearch}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                      >
+                        <Search size={16} />
+                        검색
+                      </button>
+                    </div>
+
+                    {/* 현재 위치 버튼 */}
+                    <button
+                      type="button"
+                      onClick={getCurrentLocation}
+                      className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium whitespace-nowrap"
+                    >
+                      <Navigation size={16} />
+                      현재 위치
+                    </button>
+                  </div>
+
+                  {/* 지도 */}
+                  <div
+                    ref={mapRef}
+                    className="w-full h-96 rounded-lg border-2 border-gray-300"
+                  />
+                  <p className="text-xs text-gray-500">
+                    💡 지도를 클릭하여 실종 위치를 선택하세요. 주소와 좌표가 자동으로 입력됩니다.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {/* 실종 장소 */}
@@ -266,7 +551,13 @@ export default function CreateLostCatPostPage() {
                     onChange={handleChange}
                     placeholder="예) 서울시 강남구 역삼동 123-45"
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    readOnly={showMap} // 지도 모드에서는 읽기 전용
                   />
+                  {showMap && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      지도에서 위치를 선택하면 자동으로 입력됩니다
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -282,7 +573,8 @@ export default function CreateLostCatPostPage() {
                       onChange={handleChange}
                       placeholder="예) 37.4979"
                       step="any"
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                      readOnly={showMap} // 지도 모드에서는 읽기 전용
                     />
                   </div>
 
@@ -298,7 +590,8 @@ export default function CreateLostCatPostPage() {
                       onChange={handleChange}
                       placeholder="예) 127.0276"
                       step="any"
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                      readOnly={showMap} // 지도 모드에서는 읽기 전용
                     />
                   </div>
                 </div>
