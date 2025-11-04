@@ -87,6 +87,7 @@ export default function Page() {
 
   return (
     <div>
+
       <Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} />
       <main className="max-w-7xl mx-auto">
         <Banner />

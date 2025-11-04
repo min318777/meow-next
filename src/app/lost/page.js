@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import PostCard from "../components/PostCard";
+import { publicGet } from "../utils/authFetch";
 
 export default function LostPage() {
   const [allPosts, setAllPosts] = useState([]); // 전체 게시물
@@ -14,33 +15,21 @@ export default function LostPage() {
 
   // 전체 게시물 가져오기
   useEffect(() => {
-    const accessToken = localStorage.getItem("accessToken");
-
     const fetchAllPosts = async () => {
       try {
+        // publicGet을 사용하여 로그인 없이도 조회 가능
         // 백엔드가 페이징을 제대로 안 하므로 size를 크게 설정해서 모든 데이터 가져오기
-        const res = await fetch(
-          `http://localhost:8080/api/meow/lost-cat?page=0&size=1000`,
-          {
-            method: "GET",
-            headers: {
-              "Content-type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-            },
-            credentials: "include",
-          }
+        const data = await publicGet(
+          `http://localhost:8080/api/meow/lost-cat?page=0&size=1000`
         );
 
-        if (!res.ok) {
-          throw new Error(`서버 오류: ${res.status}`);
-        }
-        const data = await res.json();
         console.log("API 응답 데이터:", data.data);
         console.log("전체 게시물 수:", data.data.content?.length);
 
         setAllPosts(data.data.content || []);
       } catch (err) {
         console.error("게시물 조회 실패:", err);
+        // 에러가 발생해도 로그인 페이지로 리다이렉트하지 않음
       }
     };
     fetchAllPosts();

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import PostCard from "../components/PostCard";
-import { authGet } from "../utils/authFetch";
+import { publicGet } from "../utils/authFetch";
 
 export default function BoastPage() {
   const [allPosts, setAllPosts] = useState([]); // 전체 게시물
@@ -17,9 +17,9 @@ export default function BoastPage() {
   useEffect(() => {
     const fetchAllPosts = async () => {
       try {
-        // authGet 함수를 사용하여 자동 토큰 재발급 적용
+        // publicGet 함수를 사용하여 로그인 없이도 조회 가능
         // 백엔드가 페이징을 제대로 안 하므로 size를 크게 설정해서 모든 데이터 가져오기
-        const data = await authGet(
+        const data = await publicGet(
           `http://localhost:8080/api/meow/boast-cat?page=0&size=1000`
         );
 
@@ -29,7 +29,8 @@ export default function BoastPage() {
         setAllPosts(data.data.content || []);
       } catch (err) {
         console.error("게시물 조회 실패:", err);
-        // authGet에서 이미 로그인 페이지로 리다이렉트 처리됨
+        // 에러가 발생해도 로그인 페이지로 리다이렉트하지 않음
+        // 사용자에게 에러 메시지를 표시하거나 빈 목록을 유지
       }
     };
     fetchAllPosts();

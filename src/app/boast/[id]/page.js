@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import Header from "../../components/Header";
+import { publicGet, authPost } from "../../utils/authFetch";
 
 export default function BoastDetailPage() {
   const params = useParams();
@@ -17,66 +18,45 @@ export default function BoastDetailPage() {
   const commentsPerPage = 5; // 페이지당 댓글 수
   const hasFetchedRef = useRef(false); // API 호출 여부 추적
 
-  // 댓글 목록을 가져오는 함수
+  // 댓글 목록을 가져오는 함수 (로그인 불필요)
   const fetchComments = async () => {
     setIsLoadingComments(true);
-    const accessToken = localStorage.getItem("accessToken");
     try {
-      const res = await fetch(`http://localhost:8080/api/meow/boast-cat/comments/${id}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      // publicGet을 사용하여 로그인 없이도 댓글 조회 가능
+      const data = await publicGet(`http://localhost:8080/api/meow/boast-cat/comments/${id}`);
 
-      if (res.ok) {
-        const data = await res.json();
-        console.log("댓글 API 응답:", data);
-        // 다양한 응답 구조에 대응
-        const commentsData = data.data || data.comments || data || [];
-        console.log("댓글 데이터:", commentsData); // 댓글 배열 확인
-        setComments(commentsData);
-      } else {
-        console.error("댓글 조회 실패:", res.status, res.statusText);
-      }
+      console.log("댓글 API 응답:", data);
+      // 다양한 응답 구조에 대응
+      const commentsData = data.data || data.comments || data || [];
+      console.log("댓글 데이터:", commentsData); // 댓글 배열 확인
+      setComments(commentsData);
     } catch (err) {
       console.error("댓글 조회 실패:", err);
+      // 에러가 발생해도 페이지는 정상 표시 (댓글만 빈 상태)
     } finally {
       setIsLoadingComments(false);
     }
   };
 
-  // 새 댓글을 제출하는 함수
+  // 새 댓글을 제출하는 함수 (로그인 필수)
   const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
-    const accessToken = localStorage.getItem("accessToken");
 
     try {
-      const res = await fetch(`http://localhost:8080/api/meow/boast-cat/comments/${id}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          content: newComment.trim()
-        }),
+      // authPost를 사용하여 인증된 사용자만 댓글 작성 가능
+      await authPost(`http://localhost:8080/api/meow/boast-cat/comments/${id}`, {
+        content: newComment.trim()
       });
 
-      if (res.ok) {
-        setNewComment(""); // 입력창 초기화
-        setCurrentCommentPage(1); // 댓글 작성 후 첫 페이지로 이동
-        fetchComments(); // 댓글 목록 새로고침
-      } else {
-        throw new Error("댓글 작성 실패");
-      }
+      setNewComment(""); // 입력창 초기화
+      setCurrentCommentPage(1); // 댓글 작성 후 첫 페이지로 이동
+      fetchComments(); // 댓글 목록 새로고침
     } catch (err) {
       console.error("댓글 작성 실패:", err);
-      alert("댓글 작성에 실패했습니다. 다시 시도해주세요.");
+      alert("댓글 작성에 실패했습니다. 로그인이 필요하거나 다시 시도해주세요.");
     } finally {
       setIsSubmitting(false);
     }
@@ -91,26 +71,17 @@ export default function BoastDetailPage() {
 
     hasFetchedRef.current = true;
 
-    const accessToken = localStorage.getItem("accessToken");
-
     const fetchDetail = async () => {
       try {
         console.log(`상세 조회 API 호출 (게시물 ID: ${id})`);
-        const res = await fetch(`http://localhost:8080/api/meow/boast-cat/${id}`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
+        // publicGet을 사용하여 로그인 없이도 게시물 상세 조회 가능
+        const data = await publicGet(`http://localhost:8080/api/meow/boast-cat/${id}`);
 
-        if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
-
-        const data = await res.json();
         setPost(data.data);
         console.log(`게시물 ${id} 조회 완료`);
       } catch (err) {
         console.error("상세 조회 실패:", err);
+        // 에러 발생 시에도 사용자에게 적절한 메시지 표시
       }
     };
 

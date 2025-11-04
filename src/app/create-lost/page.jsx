@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
+import { X } from "lucide-react"; // 이미지 삭제 아이콘
 
 export default function CreateLostCatPostPage() {
   const router = useRouter();
@@ -18,8 +19,17 @@ export default function CreateLostCatPostPage() {
     longitude: "",
     reward: "",
   });
-  const [files, setFiles] = useState([]);
+  const [files, setFiles] = useState([]); // 실제 File 객체 배열
+  const [previewUrls, setPreviewUrls] = useState([]); // 미리보기 URL 배열
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // 컴포넌트 unmount 시 메모리 정리
+  useEffect(() => {
+    return () => {
+      // 모든 미리보기 URL의 메모리 해제
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [previewUrls]);
 
   // 텍스트 필드 변경
   const handleChange = (e) => {
@@ -27,11 +37,32 @@ export default function CreateLostCatPostPage() {
     setForm({ ...form, [name]: value });
   };
 
-  // 파일 선택
+  // 파일 선택 및 미리보기 생성
   const handleFileChange = (e) => {
-    if (e.target.files) {
-      setFiles(Array.from(e.target.files));
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFiles = Array.from(e.target.files);
+      setFiles(selectedFiles);
+
+      // 이전 미리보기 URL 메모리 해제
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+
+      // 새로운 미리보기 URL 생성
+      const newPreviewUrls = selectedFiles.map(file => URL.createObjectURL(file));
+      setPreviewUrls(newPreviewUrls);
     }
+  };
+
+  // 개별 이미지 삭제
+  const removeImage = (index) => {
+    // 미리보기 URL 메모리 해제
+    URL.revokeObjectURL(previewUrls[index]);
+
+    // 해당 인덱스의 파일과 미리보기 제거
+    const newFiles = files.filter((_, i) => i !== index);
+    const newPreviewUrls = previewUrls.filter((_, i) => i !== index);
+
+    setFiles(newFiles);
+    setPreviewUrls(newPreviewUrls);
   };
 
   // 제출
@@ -40,34 +71,46 @@ export default function CreateLostCatPostPage() {
     try {
       const accessToken = localStorage.getItem("accessToken");
 
-      // FormData 대신 JSON으로 전송 (백엔드 @RequestBody 사용)
-      const requestBody = {
-        title: form.title,
-        content: form.content,
-        catName: form.catName,
-        catType: form.catType,
-        catColor: form.catColor,
-        catAge: form.catAge ? parseInt(form.catAge) : null,
-        catWeight: form.catWeight ? parseInt(form.catWeight) : null,
-        lostLocation: form.lostLocation,
-        latitude: form.latitude ? parseFloat(form.latitude) : null,
-        longitude: form.longitude ? parseFloat(form.longitude) : null,
-        reward: form.reward ? parseInt(form.reward) : null,
-      };
+      // FormData 생성 (이미지 파일 포함을 위해)
+      const formData = new FormData();
+
+      // 텍스트 필드 추가
+      formData.append("title", form.title);
+      formData.append("content", form.content);
+
+      // 선택적 필드들 (값이 있을 때만 추가)
+      if (form.catName) formData.append("catName", form.catName);
+      if (form.catType) formData.append("catType", form.catType);
+      if (form.catColor) formData.append("catColor", form.catColor);
+      if (form.catAge) formData.append("catAge", form.catAge);
+      if (form.catWeight) formData.append("catWeight", form.catWeight);
+      if (form.lostLocation) formData.append("lostLocation", form.lostLocation);
+      if (form.latitude) formData.append("latitude", form.latitude);
+      if (form.longitude) formData.append("longitude", form.longitude);
+      if (form.reward) formData.append("reward", form.reward);
+
+      // 이미지 파일들 추가 (백엔드의 'images' 필드명에 맞춤)
+      files.forEach((file) => {
+        formData.append("images", file);
+      });
 
       const res = await fetch("http://localhost:8080/api/meow/lost-cat", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          // Content-Type을 명시하지 않음 (브라우저가 자동으로 multipart/form-data 설정)
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify(requestBody),
+        body: formData, // FormData 객체 전송
       });
 
       const data = await res.json();
 
       if (res.ok) {
         alert("고양이 찾기글 등록 완료!");
+
+        // 메모리 정리: 미리보기 URL 해제
+        previewUrls.forEach(url => URL.revokeObjectURL(url));
+
         router.push("/lost");
       } else {
         alert(`등록 실패: ${data.message}`);
@@ -294,6 +337,35 @@ export default function CreateLostCatPostPage() {
               <p className="text-xs text-gray-500 mt-2">
                 * 고양이를 식별할 수 있는 명확한 사진을 올려주세요
               </p>
+
+              {/* 이미지 미리보기 */}
+              {previewUrls.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3">
+                    선택된 이미지 ({previewUrls.length}장)
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {previewUrls.map((url, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={url}
+                          alt={`미리보기 ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
+                        />
+                        {/* 삭제 버튼 */}
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          aria-label="이미지 삭제"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 안내 메시지 */}

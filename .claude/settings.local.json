@@ -6,5 +6,9 @@
       "Bash(taskkill:*)"
     ]
   },
-  "outputStyle": "korean"
+  "outputStyle": "korean",
+  "statusLine": {
+    "type": "command",
+    "command": "python3 .claude/scripts/context-monitor.py"
+  }
 }

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Header from "../components/Header";
 import { Search, AlertCircle } from "lucide-react";
-import { authPost } from "../utils/authFetch";
+import { publicPost } from "../utils/authFetch";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
@@ -38,8 +38,8 @@ export default function SearchPage() {
           userId: null
         };
 
-        // authPost 함수를 사용하여 자동 토큰 재발급 적용
-        const data = await authPost(
+        // publicPost 함수를 사용하여 로그인 없이도 검색 가능
+        const data = await publicPost(
           `http://localhost:8080/api/meow/search?page=${currentPage}&size=10`,
           requestBody
         );
@@ -56,6 +56,7 @@ export default function SearchPage() {
       } catch (err) {
         console.error("검색 오류:", err);
         setError("검색 중 오류가 발생했습니다.");
+        // 에러가 발생해도 로그인 페이지로 리다이렉트하지 않음
       } finally {
         setLoading(false);
       }

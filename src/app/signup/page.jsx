@@ -27,12 +27,27 @@ export default function SignUpPage() {
         const data = await res.json();
         if (res.ok){
             alert("회원가입 성공");
+            // 회원가입 성공 후 로그인 페이지로 이동
+            window.location.href = "/signin";
         } else{
-            alert("회원가입 실패: ${data.message}");
+            // 백엔드 에러 메시지 처리
+            let errorMessage = "회원가입 실패";
+
+            if (data.message) {
+                errorMessage = data.message;
+
+                // 이메일 형식 오류에 대한 특별 처리
+                if (data.message.includes("이메일") || data.message.includes("email") ||
+                    data.message.includes("Email") || data.message.includes("올바르지")) {
+                    errorMessage = "이메일 형식이 올바르지 않습니다.\n올바른 형식: example@email.com";
+                }
+            }
+
+            alert(errorMessage);
         }
     } catch (err){
         console.error(err);
-        alert("회원가입 중 오류 발생");
+        alert("회원가입 중 오류가 발생했습니다.");
     }
     console.log("회원가입 데이터:", form);
   };

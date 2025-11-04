@@ -99,25 +99,28 @@ export async function authFetch(url, options = {}) {
 
   // 3단계: API 요청
   try {
+    console.log(`📤 API 요청: ${options.method || 'GET'} ${url}`);
     const response = await fetch(url, {
       ...options,
       headers,
       credentials: "include", // 쿠키 포함
     });
 
+    console.log(`📥 응답 상태: ${response.status} ${response.statusText}`);
+
     // 4단계: 401/403 에러 처리 (토큰 만료 또는 유효하지 않음)
     if (response.status === 401 || response.status === 403) {
-      console.warn("⚠️ 인증 오류 발생. 토큰 재발급 시도...");
+      console.warn(`⚠️ ${response.status} 인증 오류 발생. 토큰 재발급 시도...`);
 
       // 토큰 재발급 시도
       const refreshed = await refreshAccessToken();
 
       if (refreshed) {
         // 재발급 성공 - 원래 요청 재시도
-        console.log("🔁 원래 요청 재시도...");
+        console.log("🔁 토큰 재발급 성공! 원래 요청 재시도...");
         const newAccessToken = localStorage.getItem("accessToken");
 
-        return fetch(url, {
+        const retryResponse = await fetch(url, {
           ...options,
           headers: {
             ...headers,
@@ -125,9 +128,12 @@ export async function authFetch(url, options = {}) {
           },
           credentials: "include",
         });
+
+        console.log(`📥 재시도 응답 상태: ${retryResponse.status} ${retryResponse.statusText}`);
+        return retryResponse;
       } else {
         // 재발급 실패 - 로그인 페이지로 리다이렉트
-        console.error("❌ 재발급 실패. 로그인 페이지로 이동합니다.");
+        console.error("❌ 토큰 재발급 실패. 로그인 페이지로 이동합니다.");
         localStorage.removeItem("accessToken");
         localStorage.removeItem("loginId");
         window.location.href = "/signin";
@@ -239,6 +245,99 @@ export async function authPostFormData(url, formData) {
     return response.json();
   } catch (error) {
     console.error("❌ FormData 전송 중 오류:", error);
+    throw error;
+  }
+}
+
+/**
+ * 공개 API를 위한 GET 요청 함수 (인증 선택적)
+ *
+ * @param {string} url - API 엔드포인트 URL
+ * @returns {Promise<any>} JSON 파싱된 응답 데이터
+ *
+ * 동작 원리:
+ * - localStorage에 accessToken이 있으면 Authorization 헤더 포함
+ * - 토큰이 없어도 요청은 진행 (로그인 리다이렉트 하지 않음)
+ * - 로그인하지 않은 사용자도 공개 콘텐츠를 볼 수 있도록 지원
+ *
+ * 사용 예시:
+ * ```javascript
+ * // 비로그인 사용자도 게시물 목록 조회 가능
+ * const data = await publicGet("http://localhost:8080/api/meow/boast-cat?page=0&size=10");
+ * ```
+ */
+export async function publicGet(url) {
+  // 토큰이 있으면 포함, 없으면 그냥 진행
+  const accessToken = localStorage.getItem("accessToken");
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers,
+      credentials: "include", // 쿠키 포함 (있는 경우)
+    });
+
+    if (!response.ok) {
+      throw new Error(`서버 오류: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("❌ Public GET 요청 중 오류:", error);
+    throw error;
+  }
+}
+
+/**
+ * 공개 API를 위한 POST 요청 함수 (인증 선택적)
+ *
+ * @param {string} url - API 엔드포인트 URL
+ * @param {object} body - 요청 본문 데이터
+ * @returns {Promise<any>} JSON 파싱된 응답 데이터
+ *
+ * 동작 원리:
+ * - localStorage에 accessToken이 있으면 Authorization 헤더 포함
+ * - 토큰이 없어도 요청은 진행 (로그인 리다이렉트 하지 않음)
+ * - 검색 등 비로그인 사용자도 이용 가능한 POST 요청에 사용
+ *
+ * 사용 예시:
+ * ```javascript
+ * // 비로그인 사용자도 검색 가능
+ * const data = await publicPost("http://localhost:8080/api/meow/search", {
+ *   title: "고양이",
+ *   contents: "고양이"
+ * });
+ * ```
+ */
+export async function publicPost(url, body) {
+  // 토큰이 있으면 포함, 없으면 그냥 진행
+  const accessToken = localStorage.getItem("accessToken");
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      credentials: "include", // 쿠키 포함 (있는 경우)
+    });
+
+    if (!response.ok) {
+      throw new Error(`서버 오류: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("❌ Public POST 요청 중 오류:", error);
     throw error;
   }
 }
