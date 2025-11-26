@@ -183,9 +183,6 @@ export default function MyPage() {
                 <h1 className="text-2xl font-bold text-gray-800">
                   {summary.loginId}님의 마이페이지
                 </h1>
-                <p className="text-gray-600 mt-1">
-                  가입일: {formatDate(summary.createdAt)}
-                </p>
               </div>
             </div>
 
