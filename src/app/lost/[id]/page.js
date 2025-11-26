@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import Header from "../../components/Header";
-import { publicGet, authPost } from "../../utils/authFetch";
+import { publicGet, authPost, authPut, authDelete } from "../../utils/authFetch";
 
 // 카카오맵 스크립트를 동적으로 로드하는 함수
 const loadKakaoMapScript = () => {
@@ -46,6 +46,11 @@ export default function LostDetailPage() {
   const [currentCommentPage, setCurrentCommentPage] = useState(1); // 댓글 페이지 (1부터 시작)
   const commentsPerPage = 5; // 페이지당 댓글 수
   const hasFetchedRef = useRef(false); // API 호출 여부 추적
+
+  // 댓글 수정 관련 상태
+  const [editingCommentId, setEditingCommentId] = useState(null); // 수정 중인 댓글 ID
+  const [editContent, setEditContent] = useState(""); // 수정 내용
+  const [currentLoginId, setCurrentLoginId] = useState(null); // 현재 로그인 사용자 ID
 
   // 카카오맵 관련 상태 및 ref
   const mapContainerRef = useRef(null); // 지도를 표시할 DOM 요소
@@ -113,6 +118,57 @@ export default function LostDetailPage() {
       setIsSubmitting(false);
     }
   };
+
+  // 댓글 수정 시작
+  const handleEditStart = (comment) => {
+    setEditingCommentId(comment.id);
+    setEditContent(comment.contents || "");
+  };
+
+  // 댓글 수정 취소
+  const handleEditCancel = () => {
+    setEditingCommentId(null);
+    setEditContent("");
+  };
+
+  // 댓글 수정 저장
+  const handleEditSave = async (commentId) => {
+    if (!editContent.trim()) {
+      alert("댓글 내용을 입력해주세요.");
+      return;
+    }
+    try {
+      await authPut(`http://localhost:8080/api/meow/comments/${commentId}`, {
+        content: editContent.trim()
+      });
+      setEditingCommentId(null);
+      setEditContent("");
+      fetchComments();
+      alert("댓글이 수정되었습니다.");
+    } catch (err) {
+      console.error("댓글 수정 실패:", err);
+      alert("댓글 수정에 실패했습니다.");
+    }
+  };
+
+  // 댓글 삭제
+  const handleDelete = async (commentId) => {
+    if (!window.confirm("정말 이 댓글을 삭제하시겠습니까?")) return;
+    try {
+      await authDelete(`http://localhost:8080/api/meow/comments/${commentId}`);
+      fetchComments();
+      alert("댓글이 삭제되었습니다.");
+    } catch (err) {
+      console.error("댓글 삭제 실패:", err);
+      alert("댓글 삭제에 실패했습니다.");
+    }
+  };
+
+  useEffect(() => {
+    // 현재 로그인 사용자 ID 가져오기
+    const loginId = localStorage.getItem("loginId");
+    setCurrentLoginId(loginId);
+  }, []);
 
   useEffect(() => {
     // useRef를 사용해서 Strict Mode에서도 한 번만 호출되도록 보장
@@ -460,14 +516,60 @@ export default function LostDetailPage() {
                               }) : '방금 전'}
                             </p>
                           </div>
+
                         </div>
 
                         {/* 댓글 내용 */}
                         <div className="ml-11">
-                          <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-                            {commentContent}
-                          </p>
-
+                          {editingCommentId === comment.id ? (
+                            // 수정 모드
+                            <div className="space-y-3">
+                              <textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditSave(comment.id)}
+                                  className="px-4 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                                >
+                                  저장
+                                </button>
+                                <button
+                                  onClick={handleEditCancel}
+                                  className="px-4 py-1 bg-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-400"
+                                >
+                                  취소
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            // 일반 모드
+                            <>
+                              <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+                                {commentContent}
+                              </p>
+                              {/* 본인 댓글일 경우 수정/삭제 버튼 */}
+                              {currentLoginId && commentWriter === currentLoginId && (
+                                <div className="flex gap-2 mt-2">
+                                  <button
+                                    onClick={() => handleEditStart(comment)}
+                                    className="text-sm text-blue-600 hover:text-blue-800"
+                                  >
+                                    수정
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(comment.id)}
+                                    className="text-sm text-red-600 hover:text-red-800"
+                                  >
+                                    삭제
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

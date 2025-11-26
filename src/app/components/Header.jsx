@@ -90,10 +90,12 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
           <div className="hidden md:flex items-center space-x-4">
             {isLoggedIn ? (
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => router.push("/mypage")}
+                  className="flex items-center space-x-2 hover:text-blue-600 transition-colors">
                   <User className="w-5 h-5 text-gray-600" />
                   <span className="text-gray-700">{userId}님</span>
-                </div>
+                </button>
                 <button
                   onClick={handleLogout}
                   className="text-gray-600 hover:text-gray-800 transition-colors">
@@ -163,10 +165,15 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
             </form>
             {isLoggedIn ? (
               <div className="flex items-center justify-between pt-3">
-                <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    router.push("/mypage");
+                    setIsMenuOpen(false);
+                  }}
+                  className="flex items-center space-x-2 hover:text-blue-600 transition-colors">
                   <User className="w-5 h-5 text-gray-600" />
                   <span className="text-gray-700">{userId}님</span>
-                </div>
+                </button>
                 <button
                   onClick={handleLogout}
                   className="text-gray-600 hover:text-gray-800 transition-colors">

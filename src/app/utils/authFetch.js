@@ -314,6 +314,44 @@ export async function publicGet(url) {
  * });
  * ```
  */
+/**
+ * PUT 요청을 위한 헬퍼 함수 (댓글 수정 등)
+ *
+ * @param {string} url - API 엔드포인트 URL
+ * @param {object} body - 요청 본문 데이터
+ * @returns {Promise<any>} JSON 파싱된 응답 데이터
+ */
+export async function authPut(url, body) {
+  const response = await authFetch(url, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`서버 오류: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * DELETE 요청을 위한 헬퍼 함수 (댓글 삭제 등)
+ *
+ * @param {string} url - API 엔드포인트 URL
+ * @returns {Promise<any>} JSON 파싱된 응답 데이터
+ */
+export async function authDelete(url) {
+  const response = await authFetch(url, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(`서버 오류: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export async function publicPost(url, body) {
   // 토큰이 있으면 포함, 없으면 그냥 진행
   const accessToken = localStorage.getItem("accessToken");

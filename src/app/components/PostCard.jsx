@@ -30,8 +30,7 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
       >
         <div className="relative">
           <img
-            src={post.imageUrls?.[0] || post.catImageUrl || "/default-cat.png"}
-            alt={post.catName || post.title}
+            src={post.imageUrls?.[0]}
             className="w-full h-48 object-cover"
           />
           {/* 실종 배지 */}
@@ -85,8 +84,7 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
     >
       <div className="relative">
         <img
-          src={post.imageUrls?.[0] || post.catImageUrl || "/default-cat.png"}
-          alt={post.title}
+          src={post.imageUrls?.[0]}
           className="w-full h-48 object-cover"
         />
       </div>
