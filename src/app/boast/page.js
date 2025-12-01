@@ -13,6 +13,37 @@ export default function BoastPage() {
 
   const postsPerPage = 10; // 페이지당 게시물 수
 
+  // 각 게시글의 좋아요 수를 가져오는 함수
+  const fetchLikesForPosts = async (posts) => {
+    // 각 게시글의 좋아요 수를 병렬로 가져오기
+    const postsWithLikes = await Promise.all(
+      posts.map(async (post) => {
+        try {
+          const likeData = await publicGet(`http://localhost:8080/api/like/${post.id}`);
+          const likeCount = likeData.data || 0;
+
+          // localStorage에서 좋아요 상태 확인
+          const likedPosts = JSON.parse(localStorage.getItem("likedPosts") || "{}");
+          const isLiked = likedPosts[post.id] || false;
+
+          return {
+            ...post,
+            likes: likeCount,
+            isLiked: isLiked,
+          };
+        } catch (err) {
+          console.error(`게시글 ${post.id} 좋아요 수 조회 실패:`, err);
+          return {
+            ...post,
+            likes: 0,
+            isLiked: false,
+          };
+        }
+      })
+    );
+    return postsWithLikes;
+  };
+
   // 전체 게시물 가져오기
   useEffect(() => {
     const fetchAllPosts = async () => {
@@ -26,7 +57,11 @@ export default function BoastPage() {
         console.log("API 응답 데이터:", data.data);
         console.log("전체 게시물 수:", data.data.content?.length);
 
-        setAllPosts(data.data.content || []);
+        const posts = data.data.content || [];
+
+        // 각 게시글의 좋아요 수 가져오기
+        const postsWithLikes = await fetchLikesForPosts(posts);
+        setAllPosts(postsWithLikes);
       } catch (err) {
         console.error("게시물 조회 실패:", err);
         // 에러가 발생해도 로그인 페이지로 리다이렉트하지 않음
@@ -87,7 +122,6 @@ export default function BoastPage() {
                 <PostCard
                   key={post.id}
                   post={post}
-                  onLike={(postId) => console.log("좋아요 클릭", postId)}
                 />
               ))}
             </ul>

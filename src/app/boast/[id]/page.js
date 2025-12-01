@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
+import { Heart } from "lucide-react";
 import Header from "../../components/Header";
 import { publicGet, authPost, authPut, authDelete } from "../../utils/authFetch";
 
@@ -22,6 +23,11 @@ export default function BoastDetailPage() {
   const [editingCommentId, setEditingCommentId] = useState(null); // 수정 중인 댓글 ID
   const [editContent, setEditContent] = useState(""); // 수정 내용
   const [currentLoginId, setCurrentLoginId] = useState(null); // 현재 로그인 사용자 ID
+
+  // 좋아요 관련 상태
+  const [likeCount, setLikeCount] = useState(0); // 좋아요 수
+  const [isLiked, setIsLiked] = useState(false); // 좋아요 여부
+  const [isLikeProcessing, setIsLikeProcessing] = useState(false); // 좋아요 처리 중
 
   // 댓글 목록을 가져오는 함수 (로그인 불필요)
   const fetchComments = async () => {
@@ -112,6 +118,71 @@ export default function BoastDetailPage() {
     }
   };
 
+  // 좋아요 수를 가져오는 함수 (로그인 불필요)
+  const fetchLikeCount = async () => {
+    try {
+      const data = await publicGet(`http://localhost:8080/api/like/${id}`);
+      console.log("좋아요 API 응답:", data);
+
+      // 백엔드 응답 구조에 따라 좋아요 수 추출
+      const count = data.data || 0;
+      setLikeCount(count);
+
+      // localStorage에서 좋아요 상태 확인
+      const likedPosts = JSON.parse(localStorage.getItem("likedPosts") || "{}");
+      const isLikedFromStorage = likedPosts[id] || false;
+      setIsLiked(isLikedFromStorage);
+    } catch (err) {
+      console.error("좋아요 수 조회 실패:", err);
+      // 에러가 발생해도 0으로 표시
+      setLikeCount(0);
+    }
+  };
+
+  // 좋아요 토글 함수 (로그인 필수)
+  const handleLikeToggle = async () => {
+    // 로그인 여부 확인
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) {
+      alert("로그인이 필요한 기능입니다.");
+      return;
+    }
+
+    // 처리 중이면 중복 요청 방지
+    if (isLikeProcessing) return;
+
+    setIsLikeProcessing(true);
+    try {
+      const data = await authPost(`http://localhost:8080/api/like/${id}`, {});
+      console.log("좋아요 토글 응답:", data);
+
+      // 현재 좋아요 상태를 토글
+      const newIsLiked = !isLiked;
+      setIsLiked(newIsLiked);
+
+      // localStorage에 좋아요 상태 저장
+      const likedPosts = JSON.parse(localStorage.getItem("likedPosts") || "{}");
+      if (newIsLiked) {
+        likedPosts[id] = true;
+      } else {
+        delete likedPosts[id];
+      }
+      localStorage.setItem("likedPosts", JSON.stringify(likedPosts));
+
+      // 좋아요 수 업데이트 (서버에서 다시 가져오기)
+      const likeData = await publicGet(`http://localhost:8080/api/like/${id}`);
+      const count = likeData.data || 0;
+      setLikeCount(count);
+
+      // 성공 메시지는 표시하지 않음 (UX 개선)
+    } catch (err) {
+      console.error("좋아요 처리 실패:", err);
+      alert("좋아요 처리에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsLikeProcessing(false);
+    }
+  };
+
   useEffect(() => {
     // 현재 로그인 사용자 ID 가져오기
     const loginId = localStorage.getItem("loginId");
@@ -143,6 +214,7 @@ export default function BoastDetailPage() {
 
     fetchDetail();
     fetchComments(); // 페이지 로드 시 댓글도 함께 불러오기
+    fetchLikeCount(); // 페이지 로드 시 좋아요 수도 함께 불러오기
   }, [id]);
 
   if (!post) {
@@ -188,6 +260,25 @@ export default function BoastDetailPage() {
               />
             ))}
         </article>
+
+        {/* 좋아요 버튼 */}
+        <div className="flex justify-center items-center mt-12 mb-8">
+          <button
+            onClick={handleLikeToggle}
+            disabled={isLikeProcessing}
+            className={`flex items-center space-x-3 px-8 py-4 rounded-full font-medium text-lg transition-all duration-300 transform hover:scale-105 ${
+              isLiked
+                ? "bg-red-500 text-white shadow-lg"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <Heart
+              className={`w-6 h-6 transition-all ${isLiked ? "fill-current animate-pulse" : ""}`}
+            />
+            <span>{isLiked ? "좋아요!" : "좋아요"}</span>
+            <span className="font-bold">{likeCount}</span>
+          </button>
+        </div>
 
         {/* 댓글 섹션 */}
         <section className="mt-16 border-t border-gray-200 pt-12">

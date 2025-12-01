@@ -96,16 +96,10 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
         <div className="flex items-center justify-between text-sm text-gray-500">
           <span className="font-medium">{post.writer}</span>
           <div className="flex items-center space-x-4">
-            <button
-              onClick={(e) => {
-                e.stopPropagation(); // 카드 이동 방지
-                onLike(post.id);
-              }}
-              className={`flex items-center space-x-1 transition-colors ${post.isLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
-            >
-              <Heart className={`w-4 h-4 ${post.isLiked ? 'fill-current' : ''}`} />
-              <span>{post.likes}</span>
-            </button>
+            <div className="flex items-center space-x-1 text-gray-400">
+              <Heart className="w-4 h-4" />
+              <span>{post.likes || 0}</span>
+            </div>
             <span className="text-gray-400">조회 {post.view}</span>
             <span className="text-gray-400">댓글 {post.commentDtoList?.length || 0}</span>
           </div>
