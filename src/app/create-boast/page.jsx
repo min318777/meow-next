@@ -1,71 +1,74 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
+import TiptapEditor from "../components/TiptapEditor";
 import { authPostFormData } from "../utils/authFetch";
-import { X } from "lucide-react"; // 이미지 삭제 아이콘
 
 export default function CreateBoastCatPostPage() {
   const router = useRouter();
-  const [form, setForm] = useState({
-    title: "",
-    content: "",
-  });
-  const [files, setFiles] = useState([]); // 실제 File 객체 배열
-  const [previewUrls, setPreviewUrls] = useState([]); // 미리보기 URL 배열
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState(""); // HTML 형태로 저장됨
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // 컴포넌트 unmount 시 메모리 정리
-  useEffect(() => {
-    return () => {
-      // 모든 미리보기 URL의 메모리 해제
-      previewUrls.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, [previewUrls]);
+  // HTML에서 base64 이미지를 추출하는 함수
+  const extractImagesFromHTML = (html) => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const images = doc.querySelectorAll("img");
+    const imageFiles = [];
+    const imagePlaceholders = new Map();
 
-  // 텍스트 필드 변경
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+    images.forEach((img, index) => {
+      const src = img.getAttribute("src");
+      if (src && src.startsWith("data:image")) {
+        // base64를 File 객체로 변환
+        const arr = src.split(",");
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const file = new File([u8arr], `image-${index}.${mime.split("/")[1]}`, { type: mime });
+        imageFiles.push(file);
 
-  // 파일 선택 및 미리보기 생성
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const selectedFiles = Array.from(e.target.files);
-      setFiles(selectedFiles);
+        // 이미지를 플레이스홀더로 교체
+        imagePlaceholders.set(src, `[IMAGE:${index}]`);
+        img.setAttribute("src", `[IMAGE:${index}]`);
+      }
+    });
 
-      // 이전 미리보기 URL 메모리 해제
-      previewUrls.forEach(url => URL.revokeObjectURL(url));
-
-      // 새로운 미리보기 URL 생성
-      const newPreviewUrls = selectedFiles.map(file => URL.createObjectURL(file));
-      setPreviewUrls(newPreviewUrls);
-    }
-  };
-
-  // 개별 이미지 삭제
-  const removeImage = (index) => {
-    // 미리보기 URL 메모리 해제
-    URL.revokeObjectURL(previewUrls[index]);
-
-    // 해당 인덱스의 파일과 미리보기 제거
-    const newFiles = files.filter((_, i) => i !== index);
-    const newPreviewUrls = previewUrls.filter((_, i) => i !== index);
-
-    setFiles(newFiles);
-    setPreviewUrls(newPreviewUrls);
+    return { imageFiles, modifiedHTML: doc.body.innerHTML };
   };
 
   // 제출
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!title.trim()) {
+      alert("제목을 입력해주세요.");
+      return;
+    }
+
+    if (!content.trim() || content === "<p></p>") {
+      alert("내용을 입력해주세요.");
+      return;
+    }
+
     try {
+      // HTML에서 이미지 추출
+      const { imageFiles, modifiedHTML } = extractImagesFromHTML(content);
+
       // FormData 생성
       const formData = new FormData();
-      formData.append("title", form.title);
-      formData.append("content", form.content);
-      files.forEach((file) => {
-        formData.append("images", file); // 서버에서 images[]로 받기
+      formData.append("title", title);
+      formData.append("content", modifiedHTML); // 플레이스홀더가 포함된 HTML
+
+      // 이미지 파일들 추가
+      imageFiles.forEach((file) => {
+        formData.append("images", file);
       });
 
       // authPostFormData 함수를 사용하여 자동 토큰 재발급 적용
@@ -76,10 +79,6 @@ export default function CreateBoastCatPostPage() {
 
       if (data.status === "OK") {
         alert("고양이 자랑글 등록 완료!");
-
-        // 메모리 정리: 미리보기 URL 해제
-        previewUrls.forEach(url => URL.revokeObjectURL(url));
-
         router.push("/boast");
       } else {
         alert(`등록 실패: ${data.message}`);
@@ -105,69 +104,22 @@ export default function CreateBoastCatPostPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
               <input
                 type="text"
-                name="title"
-                value={form.title}
-                onChange={handleChange}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 placeholder="제목을 입력하세요"
                 className="mt-1 w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
                 required
               />
             </div>
 
-            {/* 내용 */}
+            {/* 내용 - Tiptap 에디터 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
-              <textarea
-                name="content"
-                value={form.content}
-                onChange={handleChange}
-                placeholder="내용을 입력하세요"
-                className="mt-1 w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
-                rows={7}
-                required
+              <TiptapEditor
+                content={content}
+                onChange={setContent}
+                placeholder="내용을 입력하세요. 글 중간에 이미지를 삽입할 수 있습니다."
               />
-            </div>
-
-            {/* 이미지 업로드 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">고양이 이미지 (여러 장 가능)</label>
-              <input
-                type="file"
-                name="catImages"
-                onChange={handleFileChange}
-                multiple
-                accept="image/*"
-                className="mt-1 w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              />
-
-              {/* 이미지 미리보기 */}
-              {previewUrls.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-3">
-                    선택된 이미지 ({previewUrls.length}장)
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {previewUrls.map((url, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={url}
-                          alt={`미리보기 ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
-                        />
-                        {/* 삭제 버튼 */}
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                          aria-label="이미지 삭제"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* 제출 버튼 */}

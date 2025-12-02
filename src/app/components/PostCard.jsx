@@ -83,10 +83,21 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
       className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 overflow-hidden cursor-pointer"
     >
       <div className="relative">
-        <img
-          src={post.imageUrls?.[0]}
-          className="w-full h-48 object-cover"
-        />
+        {post.imageUrls && post.imageUrls.length > 0 ? (
+          <img
+            src={post.imageUrls[0]}
+            alt={post.title}
+            className="w-full h-48 object-cover"
+            onError={(e) => {
+              console.error("이미지 로드 실패:", post.imageUrls[0]);
+              e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23f3f4f6' width='400' height='300'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='18' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3E이미지 없음%3C/text%3E%3C/svg%3E";
+            }}
+          />
+        ) : (
+          <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
+            <span className="text-gray-400">이미지 없음</span>
+          </div>
+        )}
       </div>
       <div className="p-4">
         <h3 className="font-bold text-lg mb-2 text-gray-800 hover:text-blue-600 transition-colors">

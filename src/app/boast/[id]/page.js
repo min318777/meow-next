@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 import Header from "../../components/Header";
 import { publicGet, authPost, authPut, authDelete } from "../../utils/authFetch";
 
 export default function BoastDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = Number(params.id);
   const [post, setPost] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -139,6 +140,32 @@ export default function BoastDetailPage() {
     }
   };
 
+  // 게시글 수정 버튼 클릭 (수정 페이지로 이동)
+  const handleEdit = () => {
+    router.push(`/boast/edit/${id}`);
+  };
+
+  // 게시글 삭제
+  const handleDeletePost = async () => {
+    if (!window.confirm("정말 이 게시글을 삭제하시겠습니까?")) return;
+
+    // 로그인 확인
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) {
+      alert("로그인이 필요한 기능입니다.");
+      return;
+    }
+
+    try {
+      await authDelete(`http://localhost:8080/api/meow/boast-cat/${id}`);
+      alert("게시글이 삭제되었습니다.");
+      router.push("/boast"); // 목록 페이지로 이동
+    } catch (err) {
+      console.error("게시글 삭제 실패:", err);
+      alert("게시글 삭제에 실패했습니다. 권한이 없거나 다시 시도해주세요.");
+    }
+  };
+
   // 좋아요 토글 함수 (로그인 필수)
   const handleLikeToggle = async () => {
     // 로그인 여부 확인
@@ -231,34 +258,64 @@ export default function BoastDetailPage() {
                 {post.title}
               </h1>
 
-              {/* 작성자 + 날짜 */}
-              <div className="flex items-center text-gray-500 text-sm mb-12">
-                <span className="mr-4">✍️작성자:  {post.writer}</span>
-                <span>📅 {post.createdAt}</span>
-              </div>
-        {/* 대표 이미지 */}
-        {post.imageUrls && post.imageUrls.length > 0 && (
-          <img
-            src={post.imageUrls[0]}
-            alt="대표 이미지"
-            className="w-full h-96 object-cover rounded-xl mb-10 shadow"
-          />
-        )}
+              {/* 작성자 + 날짜 + 수정/삭제 버튼 */}
+              <div className="flex items-center justify-between text-gray-500 text-sm mb-12">
+                <div className="flex items-center">
+                  <span className="mr-4">✍️작성자:  {post.writer}</span>
+                  <span>📅 {post.createdAt}</span>
+                </div>
 
+                {/* 본인 글일 경우 수정/삭제 버튼 표시 */}
+                {currentLoginId && post.writer === currentLoginId && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={handleEdit}
+                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={handleDeletePost}
+                      className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                )}
+              </div>
         {/* 본문 */}
         <article className="prose prose-lg max-w-none">
-          <p className="mb-8">{post.contents}</p>
+          <div
+            dangerouslySetInnerHTML={{
+              __html: (() => {
+                // [IMAGE:0] 플레이스홀더를 실제 이미지 URL로 치환
+                let htmlContent = post.contents || "";
 
-          {/* 추가 이미지들 */}
-          {post.imageUrls &&
-            post.imageUrls.slice(1).map((url, idx) => (
-              <img
-                key={idx}
-                src={url}
-                alt={`본문 이미지 ${idx + 1}`}
-                className="w-full rounded-lg my-8 shadow"
-              />
-            ))}
+                console.log("원본 content:", htmlContent);
+                console.log("imageUrls:", post.imageUrls);
+
+                if (post.imageUrls && post.imageUrls.length > 0) {
+                  post.imageUrls.forEach((url, index) => {
+                    // 정규식을 사용하여 <img src="[IMAGE:0]" ...> 형태의 태그 전체를 찾아서 교체
+                    const regex = new RegExp(`<img[^>]*src=["']\\[IMAGE:${index}\\]["'][^>]*>`, 'g');
+                    htmlContent = htmlContent.replace(
+                      regex,
+                      `<img src="${url}" alt="이미지 ${index + 1}" class="w-full rounded-lg my-8 shadow" />`
+                    );
+
+                    // 플레이스홀더만 있는 경우도 처리
+                    htmlContent = htmlContent.replace(
+                      `[IMAGE:${index}]`,
+                      `<img src="${url}" alt="이미지 ${index + 1}" class="w-full rounded-lg my-8 shadow" />`
+                    );
+                  });
+                }
+
+                console.log("변환된 content:", htmlContent);
+                return htmlContent;
+              })()
+            }}
+          />
         </article>
 
         {/* 좋아요 버튼 */}

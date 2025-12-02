@@ -335,6 +335,76 @@ export async function authPut(url, body) {
 }
 
 /**
+ * FormData를 사용하는 PUT 요청 (파일 업로드 포함 수정)
+ *
+ * @param {string} url - API 엔드포인트 URL
+ * @param {FormData} formData - FormData 객체
+ * @returns {Promise<any>} JSON 파싱된 응답 데이터
+ */
+export async function authPutFormData(url, formData) {
+  let accessToken = localStorage.getItem("accessToken");
+
+  if (!accessToken) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      accessToken = localStorage.getItem("accessToken");
+    } else {
+      window.location.href = "/signin";
+      throw new Error("인증이 필요합니다.");
+    }
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        // Content-Type을 설정하지 않음 - 브라우저가 자동으로 multipart/form-data로 설정
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: formData,
+      credentials: "include",
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      const refreshed = await refreshAccessToken();
+
+      if (refreshed) {
+        const newAccessToken = localStorage.getItem("accessToken");
+
+        const retryResponse = await fetch(url, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${newAccessToken}`,
+          },
+          body: formData,
+          credentials: "include",
+        });
+
+        if (!retryResponse.ok) {
+          throw new Error(`서버 오류: ${retryResponse.status}`);
+        }
+
+        return retryResponse.json();
+      } else {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("loginId");
+        window.location.href = "/signin";
+        throw new Error("인증이 만료되었습니다. 다시 로그인해주세요.");
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(`서버 오류: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("❌ PUT FormData 전송 중 오류:", error);
+    throw error;
+  }
+}
+
+/**
  * DELETE 요청을 위한 헬퍼 함수 (댓글 삭제 등)
  *
  * @param {string} url - API 엔드포인트 URL

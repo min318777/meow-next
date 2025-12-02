@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import { publicGet, authPost, authPut, authDelete } from "../../utils/authFetch";
 
@@ -35,6 +35,7 @@ const loadKakaoMapScript = () => {
 
 export default function LostDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = Number(params.id);
   const [post, setPost] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -148,6 +149,32 @@ export default function LostDetailPage() {
     } catch (err) {
       console.error("댓글 수정 실패:", err);
       alert("댓글 수정에 실패했습니다.");
+    }
+  };
+
+  // 게시글 수정 버튼 클릭 (수정 페이지로 이동)
+  const handleEdit = () => {
+    router.push(`/lost/edit/${id}`);
+  };
+
+  // 게시글 삭제
+  const handleDeletePost = async () => {
+    if (!window.confirm("정말 이 게시글을 삭제하시겠습니까?")) return;
+
+    // 로그인 확인
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) {
+      alert("로그인이 필요한 기능입니다.");
+      return;
+    }
+
+    try {
+      await authDelete(`http://localhost:8080/api/meow/lost-cat/${id}`);
+      alert("게시글이 삭제되었습니다.");
+      router.push("/lost"); // 목록 페이지로 이동
+    } catch (err) {
+      console.error("게시글 삭제 실패:", err);
+      alert("게시글 삭제에 실패했습니다. 권한이 없거나 다시 시도해주세요.");
     }
   };
 
@@ -268,27 +295,47 @@ export default function LostDetailPage() {
           {post.title}
         </h1>
 
-        {/* 작성자 + 날짜 + 조회수 */}
-        <div className="flex items-center text-gray-500 text-sm mb-8 pb-6 border-b border-gray-200">
-          <span className="mr-4 flex items-center">
-            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-            </svg>
-            {post.writer || post.loginId}
-          </span>
-          <span className="mr-4 flex items-center">
-            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-            </svg>
-            {new Date(post.createdAt).toLocaleDateString('ko-KR')}
-          </span>
-          <span className="flex items-center">
-            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-            </svg>
-            조회 {post.view || 0}
-          </span>
+        {/* 작성자 + 날짜 + 조회수 + 수정/삭제 버튼 */}
+        <div className="flex items-center justify-between text-gray-500 text-sm mb-8 pb-6 border-b border-gray-200">
+          <div className="flex items-center">
+            <span className="mr-4 flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
+              {post.writer || post.loginId}
+            </span>
+            <span className="mr-4 flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+              </svg>
+              {new Date(post.createdAt).toLocaleDateString('ko-KR')}
+            </span>
+            <span className="flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+              </svg>
+              조회 {post.view || 0}
+            </span>
+          </div>
+
+          {/* 본인 글일 경우 수정/삭제 버튼 표시 */}
+          {currentLoginId && (post.writer === currentLoginId || post.loginId === currentLoginId) && (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleEdit}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                수정
+              </button>
+              <button
+                onClick={handleDeletePost}
+                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+              >
+                삭제
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 고양이 정보 카드 */}
