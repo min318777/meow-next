@@ -606,41 +606,9 @@ export default function CreateLostCatPostPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* 위도 */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      위도 (Latitude)
-                    </label>
-                    <input
-                      type="number"
-                      name="latitude"
-                      value={form.latitude}
-                      onChange={handleChange}
-                      placeholder="예) 37.4979"
-                      step="any"
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
-                      readOnly={showMap} // 지도 모드에서는 읽기 전용
-                    />
-                  </div>
-
-                  {/* 경도 */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      경도 (Longitude)
-                    </label>
-                    <input
-                      type="number"
-                      name="longitude"
-                      value={form.longitude}
-                      onChange={handleChange}
-                      placeholder="예) 127.0276"
-                      step="any"
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
-                      readOnly={showMap} // 지도 모드에서는 읽기 전용
-                    />
-                  </div>
-                </div>
+                {/* 위도와 경도는 숨김 처리 (hidden input으로 유지하여 폼 데이터에는 포함) */}
+                <input type="hidden" name="latitude" value={form.latitude} />
+                <input type="hidden" name="longitude" value={form.longitude} />
               </div>
             </div>
 
