@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Search, User, Menu, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
+import NotificationDropdown from "./NotificationDropdown";
 
 const Header = ({ isMenuOpen, setIsMenuOpen }) => {
       const router = useRouter();
@@ -90,6 +91,9 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
           <div className="hidden md:flex items-center space-x-4">
             {isLoggedIn ? (
               <div className="flex items-center space-x-3">
+                {/* 알림 아이콘 */}
+                <NotificationDropdown userId={userId} />
+
                 <button
                   onClick={() => router.push("/mypage")}
                   className="flex items-center space-x-2 hover:text-blue-600 transition-colors">
@@ -164,21 +168,28 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
               </button>
             </form>
             {isLoggedIn ? (
-              <div className="flex items-center justify-between pt-3">
-                <button
-                  onClick={() => {
-                    router.push("/mypage");
-                    setIsMenuOpen(false);
-                  }}
-                  className="flex items-center space-x-2 hover:text-blue-600 transition-colors">
-                  <User className="w-5 h-5 text-gray-600" />
-                  <span className="text-gray-700">{userId}님</span>
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="text-gray-600 hover:text-gray-800 transition-colors">
-                  로그아웃
-                </button>
+              <div className="pt-3 space-y-3">
+                {/* 사용자 정보 + 알림 */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      router.push("/mypage");
+                      setIsMenuOpen(false);
+                    }}
+                    className="flex items-center space-x-2 hover:text-blue-600 transition-colors">
+                    <User className="w-5 h-5 text-gray-600" />
+                    <span className="text-gray-700">{userId}님</span>
+                  </button>
+                  <div className="flex items-center space-x-2">
+                    {/* 모바일 알림 아이콘 */}
+                    <NotificationDropdown userId={userId} />
+                    <button
+                      onClick={handleLogout}
+                      className="text-gray-600 hover:text-gray-800 transition-colors">
+                      로그아웃
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="flex space-x-3 pt-3">
