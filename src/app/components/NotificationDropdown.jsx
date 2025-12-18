@@ -152,7 +152,7 @@ const NotificationDropdown = ({ userId }) => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("📋 알림 목록 조회:", data);
+        console.log("📋 알림 목록 조회 :", data);
 
         // Spring Page 응답 구조: { content: [...], totalPages, totalElements, ... }
         const notificationList = data.content || [];
