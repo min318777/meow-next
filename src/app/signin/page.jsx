@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [form, setForm] = useState({
     loginId: "",
     password: ""
@@ -39,40 +41,71 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="bg-white shadow-lg rounded-xl p-8 w-full max-w-md">
-        <h2 className="text-2xl font-bold text-center text-blue-600 mb-6">로그인</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <div className="bg-white shadow-md rounded-lg p-10 w-full max-w-md">
+        {/* 제목 */}
+        <h2 className="text-2xl font-bold text-gray-900 mb-8">회원 로그인</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* 아이디 입력 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">아이디</label>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              아이디
+            </label>
             <input
               type="text"
               name="loginId"
               value={form.loginId}
               onChange={handleChange}
-              placeholder="아이디를 입력하세요"
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="아이디를 입력해 주세요"
+              className="w-full border-0 border-b-2 border-gray-300 px-0 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-black transition-colors"
               required
             />
           </div>
+
+          {/* 비밀번호 입력 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">비밀번호</label>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              비밀번호
+            </label>
             <input
               type="password"
               name="password"
               value={form.password}
               onChange={handleChange}
-              placeholder="비밀번호를 입력하세요"
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="비밀번호를 입력해 주세요"
+              className="w-full border-0 border-b-2 border-gray-300 px-0 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-black transition-colors"
               required
             />
           </div>
+
+          {/* 로그인 버튼 */}
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full bg-black text-white py-3 rounded-md hover:bg-gray-800 transition-colors font-medium mt-6"
           >
             로그인
           </button>
+
+          {/* 회원가입 버튼 */}
+          <button
+            type="button"
+            onClick={() => router.push('/signup')}
+            className="w-full bg-white text-black py-3 rounded-md border-2 border-black hover:bg-gray-50 transition-colors font-medium"
+          >
+            회원가입
+          </button>
+
+          {/* 하단 링크 */}
+          <div className="flex items-center justify-center gap-4 text-sm text-gray-500 mt-6">
+            <button type="button" className="hover:text-gray-700">
+              아이디 찾기
+            </button>
+            <span>|</span>
+            <button type="button" className="hover:text-gray-700">
+              비밀번호 찾기
+            </button>
+          </div>
         </form>
       </div>
     </div>

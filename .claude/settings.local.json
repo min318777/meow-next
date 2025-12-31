@@ -4,7 +4,14 @@
       "Bash(rm:*)",
       "Bash(npm run dev:*)",
       "Bash(taskkill:*)",
-      "Bash(cmd.exe /c \"taskkill /PID 26644 /F\")"
+      "Bash(cmd.exe /c \"taskkill /PID 26644 /F\")",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(cmd.exe /c \"taskkill /PID 67848 /F\")",
+      "Bash(cmd.exe /c \"taskkill /PID 29132 /F\")",
+      "Bash(powershell -Command \"Stop-Process -Id 29132 -Force\")",
+      "Bash(powershell -Command \"Stop-Process -Id 32628 -Force\")",
+      "Bash(powershell -Command \"Stop-Process -Id 40528 -Force\")"
     ]
   },
   "statusLine": {

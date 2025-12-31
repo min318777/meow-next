@@ -50,75 +50,81 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
         }
       };
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
 
           {/* 로고 */}
           <Link href="/" className="flex items-center">
-            <h1 className="text-2xl font-bold text-blue-600 cursor-pointer">🐱 meow</h1>
+            <h1 className="text-xl font-bold text-gray-900 cursor-pointer">🐱 meow</h1>
           </Link>
 
-          {/* 데스크톱 네비게이션 */}
-          <nav className="hidden md:flex items-center space-x-8">
+          {/* 중앙: 카테고리 + 검색창 */}
+          <div className="hidden md:flex items-center space-x-6 flex-1 justify-center">
             <button
-                                        onClick={() => router.push("/boast")} // 게시글 조회 페이지로 이동
-                                        className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-                                        고양이 자랑
-                                    </button>
-                                    <button
-                                        onClick={() => router.push("/lost")} // 고양이 찾기 페이지로 이동
-                                        className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-                                        고양이 찾기
-                                    </button>
-            <form onSubmit={handleSearch} className="flex items-center space-x-2">
-              <Search className="w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="검색..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-4 py-1 rounded-lg hover:bg-blue-700 transition-colors"
-              >검색</button>
-            </form>
-          </nav>
+              onClick={() => router.push("/boast")}
+              className="text-sm text-gray-700 hover:text-black font-medium transition-colors">
+              고양이 자랑
+            </button>
+            <button
+              onClick={() => router.push("/lost")}
+              className="text-sm text-gray-700 hover:text-black font-medium transition-colors">
+              고양이 찾기
+            </button>
 
-          {/* 로그인/회원가입 */}
+            {/* 검색창 */}
+            <form onSubmit={handleSearch} className="flex items-center ml-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="검색"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="border border-gray-300 rounded-md px-4 py-1.5 pr-10 text-sm focus:outline-none focus:border-gray-400 transition-colors w-64"
+                />
+                <button
+                  type="submit"
+                  className="absolute right-2 top-1/2 -translate-y-1/2">
+                  <Search className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* 오른쪽: 로그인/회원가입 또는 사용자 정보 */}
           <div className="hidden md:flex items-center space-x-4">
             {isLoggedIn ? (
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-4">
                 {/* 알림 아이콘 */}
                 <NotificationDropdown userId={userId} />
 
                 <button
                   onClick={() => router.push("/mypage")}
-                  className="flex items-center space-x-2 hover:text-blue-600 transition-colors">
+                  className="flex items-center space-x-2 hover:text-gray-900 transition-colors">
                   <User className="w-5 h-5 text-gray-600" />
-                  <span className="text-gray-700">{userId}님</span>
+                  <span className="text-sm text-gray-700">{userId}님</span>
                 </button>
+                <span className="text-gray-300">|</span>
                 <button
                   onClick={handleLogout}
-                  className="text-gray-600 hover:text-gray-800 transition-colors">
+                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
                   로그아웃
                 </button>
               </div>
             ) : (
-              <>
+              <div className="flex items-center space-x-3">
                 <button
                   onClick={() => router.push("/signin")}
-                  className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
+                  className="text-sm text-gray-700 hover:text-black transition-colors">
                   로그인
                 </button>
+                <span className="text-gray-300">|</span>
                 <button
                   onClick={() => router.push("/signup")}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                  className="text-sm text-gray-700 hover:text-black transition-colors">
                   회원가입
                 </button>
-              </>
+              </div>
             )}
           </div>
 

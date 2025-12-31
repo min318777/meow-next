@@ -59,15 +59,19 @@ export default function BoastDetailPage() {
 
     try {
       // authPost를 사용하여 인증된 사용자만 댓글 작성 가능
-      await authPost(`http://localhost:8080/api/meow/boast-cat/comments/${id}`, {
+      console.log("📝 댓글 작성 시작 - PostID:", id);
+      const response = await authPost(`http://localhost:8080/api/meow/boast-cat/comments/${id}`, {
         content: newComment.trim()
       });
+
+      console.log("✅ 댓글 작성 성공:", response);
+      alert("댓글이 작성되었습니다!");
 
       setNewComment(""); // 입력창 초기화
       setCurrentCommentPage(1); // 댓글 작성 후 첫 페이지로 이동
       fetchComments(); // 댓글 목록 새로고침
     } catch (err) {
-      console.error("댓글 작성 실패:", err);
+      console.error("❌ 댓글 작성 실패:", err);
       alert("댓글 작성에 실패했습니다. 로그인이 필요하거나 다시 시도해주세요.");
     } finally {
       setIsSubmitting(false);
