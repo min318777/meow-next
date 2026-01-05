@@ -29,7 +29,7 @@ const NotificationDropdown = ({ userId }) => {
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown ", handleClickOutside);
   }, []);
 
   // 알림 목록 초기 로드
