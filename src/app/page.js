@@ -1,14 +1,21 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "./components/Header";
 import Banner from "./components/Banner";
-import PostCard from "./components/PostCard";
+import HorizontalPostCard from "./components/HorizontalPostCard";
 
 export default function Page() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [posts, setPosts] = useState([]);
+  // 자랑글과 찾기글을 분리하여 저장
+  const [boastPosts, setBoastPosts] = useState([]);
+  const [lostPosts, setLostPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // 스크롤 컨테이너 참조
+  const boastScrollRef = useRef(null);
+  const lostScrollRef = useRef(null);
 
   // 최근 게시글 가져오기 (고양이 자랑 + 고양이 찾기)
   useEffect(() => {
@@ -42,29 +49,19 @@ export default function Page() {
         const boastData = boastRes.ok ? await boastRes.json() : { data: { content: [] } };
         const lostData = lostRes.ok ? await lostRes.json() : { data: { content: [] } };
 
-        // 두 배열 합치기 및 카테고리 정보 추가
-        const boastPosts = (boastData.data?.content || []).map(post => ({
-          ...post,
-          category: "고양이 자랑",
-          basePath: "/boast"
-        }));
+        // 자랑글: 날짜 최신순 정렬
+        const sortedBoastPosts = (boastData.data?.content || [])
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        const lostPosts = (lostData.data?.content || []).map(post => ({
-          ...post,
-          category: "고양이 찾기",
-          basePath: "/lost"
-        }));
+        // 찾기글: 날짜 최신순 정렬
+        const sortedLostPosts = (lostData.data?.content || [])
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        // 합친 후 생성일자(createdAt) 기준 내림차순 정렬 (최신순)
-        const allPosts = [...boastPosts, ...lostPosts].sort((a, b) => {
-          return new Date(b.createdAt) - new Date(a.createdAt);
-        });
+        setBoastPosts(sortedBoastPosts);
+        setLostPosts(sortedLostPosts);
 
-        // 최신 6개만 표시
-        setPosts(allPosts.slice(0, 6));
-
-        console.log("전체 게시글 수:", allPosts.length);
-        console.log("표시할 최근 게시글:", allPosts.slice(0, 6));
+        console.log("자랑글 수:", sortedBoastPosts.length);
+        console.log("찾기글 수:", sortedLostPosts.length);
       } catch (error) {
         console.error("게시글 조회 실패:", error);
       } finally {
@@ -75,22 +72,80 @@ export default function Page() {
     fetchRecentPosts();
   }, []);
 
-  const handleLike = (id) => {
-    setPosts(prev =>
-      prev.map(post =>
-        post.id === id
-          ? { ...post, isLiked: !post.isLiked, likes: post.isLiked ? post.likes - 1 : post.likes + 1 }
-          : post
-      )
-    );
+  // 가로 스크롤 함수
+  const scroll = (ref, direction) => {
+    if (ref.current) {
+      const scrollAmount = 280; // 카드 너비 + 간격
+      ref.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
   };
+
+  // 가로 스크롤 섹션 컴포넌트
+  const HorizontalScrollSection = ({ title, posts, scrollRef, basePath, emptyMessage }) => (
+    <div className="mb-10">
+      {/* 섹션 헤더 */}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xl font-bold text-gray-800">{title}</h3>
+        {posts.length > 0 && (
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => scroll(scrollRef, "left")}
+              className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+              aria-label="이전"
+            >
+              <ChevronLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <button
+              onClick={() => scroll(scrollRef, "right")}
+              className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+              aria-label="다음"
+            >
+              <ChevronRight className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 카드 목록 */}
+      {posts.length === 0 ? (
+        <div className="text-center py-8 bg-gray-50 rounded-xl">
+          <p className="text-gray-500">{emptyMessage}</p>
+        </div>
+      ) : (
+        <div
+          ref={scrollRef}
+          className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide"
+          style={{
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+        >
+          {posts.map((post) => (
+            <HorizontalPostCard
+              key={post.id}
+              post={post}
+              basePath={basePath}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div>
-
-      <Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} />
+      <Header
+        isMenuOpen={isMenuOpen}
+        setIsMenuOpen={setIsMenuOpen}
+        isLoggedIn={isLoggedIn}
+        setIsLoggedIn={setIsLoggedIn}
+      />
       <main className="max-w-7xl mx-auto">
         <Banner />
+
         <section className="px-4 pb-12">
           <h2 className="text-2xl font-bold mb-6">최근 게시글</h2>
 
@@ -99,26 +154,36 @@ export default function Page() {
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
-          ) : posts.length === 0 ? (
-            // 게시글 없음
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">아직 등록된 게시글이 없습니다.</p>
-            </div>
           ) : (
-            // 게시글 목록
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {posts.map(post => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  basePath={post.basePath}
-                  onLike={handleLike}
-                />
-              ))}
-            </div>
+            <>
+              {/* 1줄: 고양이 자랑글 */}
+              <HorizontalScrollSection
+                title="🐱 고양이 자랑"
+                posts={boastPosts}
+                scrollRef={boastScrollRef}
+                basePath="/boast"
+                emptyMessage="아직 등록된 자랑글이 없습니다."
+              />
+
+              {/* 2줄: 고양이 찾기글 */}
+              <HorizontalScrollSection
+                title="🔍 고양이 찾기"
+                posts={lostPosts}
+                scrollRef={lostScrollRef}
+                basePath="/lost"
+                emptyMessage="아직 등록된 찾기글이 없습니다."
+              />
+            </>
           )}
         </section>
       </main>
+
+      {/* 스크롤바 숨기기 스타일 */}
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 }

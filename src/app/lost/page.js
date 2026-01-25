@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import PostCard from "../components/PostCard";
@@ -7,18 +7,25 @@ import { publicGet } from "../utils/authFetch";
 
 export default function LostPage() {
   const [allPosts, setAllPosts] = useState([]); // 전체 게시물
+  const [displayedPosts, setDisplayedPosts] = useState([]); // 화면에 표시할 게시물
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0); // 현재 페이지 (0부터 시작)
+  const [loading, setLoading] = useState(true); // 초기 로딩 상태
+  const [loadingMore, setLoadingMore] = useState(false); // 추가 로딩 상태
+  const [hasMore, setHasMore] = useState(true); // 더 불러올 게시물이 있는지
   const router = useRouter();
 
-  const postsPerPage = 10; // 페이지당 게시물 수
+  // 무한 스크롤 감지를 위한 ref
+  const observerRef = useRef(null);
+  const loadMoreRef = useRef(null);
+
+  // 한 번에 표시할 게시물 수 (4개 × 10줄 = 40개)
+  const postsPerLoad = 40;
 
   // 전체 게시물 가져오기
   useEffect(() => {
     const fetchAllPosts = async () => {
+      setLoading(true);
       try {
-        // publicGet을 사용하여 로그인 없이도 조회 가능
-        // 백엔드가 페이징을 제대로 안 하므로 size를 크게 설정해서 모든 데이터 가져오기
         const data = await publicGet(
           `http://localhost:8080/api/meow/lost-cat?page=0&size=1000`
         );
@@ -26,15 +33,20 @@ export default function LostPage() {
         console.log("API 응답 데이터:", data.data);
         console.log("전체 게시물 수:", data.data.content?.length);
 
-        setAllPosts(data.data.content || []);
+        const posts = data.data.content || [];
+
+        setAllPosts(posts);
+        // 처음에는 40개만 표시
+        setDisplayedPosts(posts.slice(0, postsPerLoad));
+        setHasMore(posts.length > postsPerLoad);
       } catch (err) {
         console.error("게시물 조회 실패:", err);
-        // 에러가 발생해도 로그인 페이지로 리다이렉트하지 않음
+      } finally {
+        setLoading(false);
       }
     };
     fetchAllPosts();
 
-    // 페이지가 다시 보일 때마다 데이터 새로고침
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         console.log("페이지가 다시 활성화됨 - 데이터 새로고침");
@@ -47,96 +59,100 @@ export default function LostPage() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []); // 마운트될 때만 이벤트 리스너 등록
+  }, []);
 
-  // 현재 페이지에 표시할 게시물 계산
-  /*2. 프론트엔드에서 페이징 처리
-      const startIndex = currentPage * 10; // 0, 10, 20, ...
-      const endIndex = startIndex + 10;    // 10, 20, 30, ...
-      const currentPosts = allPosts.slice(startIndex, endIndex);
-    */
-  const totalPages = Math.ceil(allPosts.length / postsPerPage);
-  const startIndex = currentPage * postsPerPage;
-  const endIndex = startIndex + postsPerPage;
-  const currentPosts = allPosts.slice(startIndex, endIndex);
+  // 더 많은 게시물 로드
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
 
-  console.log(`현재 페이지: ${currentPage + 1}, 표시할 게시물: ${startIndex}-${endIndex - 1} (총 ${currentPosts.length}개)`);
+    setLoadingMore(true);
+
+    // 약간의 딜레이를 주어 로딩 효과 표시
+    setTimeout(() => {
+      const currentLength = displayedPosts.length;
+      const nextPosts = allPosts.slice(currentLength, currentLength + postsPerLoad);
+
+      if (nextPosts.length > 0) {
+        setDisplayedPosts(prev => [...prev, ...nextPosts]);
+        setHasMore(currentLength + nextPosts.length < allPosts.length);
+      } else {
+        setHasMore(false);
+      }
+
+      setLoadingMore(false);
+    }, 300);
+  }, [loadingMore, hasMore, displayedPosts.length, allPosts]);
+
+  // Intersection Observer 설정
+  useEffect(() => {
+    if (loading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    observerRef.current = observer;
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [loading, hasMore, loadingMore, loadMore]);
 
   return (
     <div>
       <Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">고양이 찾기 게시물</h2>
           <button
             onClick={() => router.push("/create-lost")}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+          >
             글 등록
           </button>
         </div>
 
-        {allPosts.length === 0 ? (
+        {/* 초기 로딩 */}
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+          </div>
+        ) : allPosts.length === 0 ? (
           <p className="text-gray-500">등록된 게시물이 없습니다.</p>
         ) : (
           <>
-            <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {currentPosts.map((post) => (
+            {/* 한 줄에 4개씩 표시하는 그리드 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {displayedPosts.map((post) => (
                 <PostCard
                   key={post.id}
                   post={post}
                   basePath="/lost"
-                  onLike={(postId) => console.log("좋아요 클릭", postId)}
                 />
               ))}
-            </ul>
+            </div>
 
-            {/* 페이지네이션 */}
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center mt-8 space-x-2">
-                {/* 이전 버튼 */}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
-                  disabled={currentPage === 0}
-                  className="px-3 py-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  이전
-                </button>
-
-                {/* 페이지 번호 */}
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      console.log(`페이지 ${i + 1}로 이동`);
-                      setCurrentPage(i);
-                    }}
-                    className={`px-3 py-1 rounded-lg transition-colors ${
-                      i === currentPage
-                        ? "bg-blue-600 text-white font-semibold"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-
-                {/* 다음 버튼 */}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
-                  disabled={currentPage === totalPages - 1}
-                  className="px-3 py-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  다음
-                </button>
-
-                {/* 페이지 정보 */}
-                <span className="ml-4 text-sm text-gray-500">
-                  {currentPage + 1} / {totalPages} 페이지
-                </span>
-              </div>
-            )}
+            {/* 무한 스크롤 감지 영역 */}
+            <div ref={loadMoreRef} className="h-20 flex justify-center items-center mt-4">
+              {loadingMore && (
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              )}
+              {!hasMore && displayedPosts.length > 0 && (
+                <p className="text-gray-400 text-sm">모든 게시물을 불러왔습니다</p>
+              )}
+            </div>
           </>
         )}
       </main>

@@ -5,19 +5,42 @@ import { useRouter } from 'next/navigation';
 import Link from "next/link";
 import NotificationDropdown from "./NotificationDropdown";
 
+/**
+ * 헤더 컴포넌트
+ *
+ * 기능:
+ * - 네비게이션 (고양이 자랑, 고양이 찾기)
+ * - 검색창
+ * - 로그인 상태에 따른 UI 변경
+ * - 알림 드롭다운 (로그인 시)
+ * - 로그아웃 처리
+ *
+ * localStorage 사용:
+ * - accessToken: JWT 액세스 토큰
+ * - userId: 사용자 고유 ID (숫자, 알림 등 API에 사용)
+ * - loginId: 로그인 아이디 (UI 표시용)
+ * - role: 사용자 권한
+ */
 const Header = ({ isMenuOpen, setIsMenuOpen }) => {
       const router = useRouter();
       const [searchQuery, setSearchQuery] = useState('');
       const [isLoggedIn, setIsLoggedIn] = useState(false);
+      // displayName: UI에 표시할 사용자 이름 (loginId)
+      const [displayName, setDisplayName] = useState('');
+      // userId: API 요청에 사용할 사용자 ID (숫자)
       const [userId, setUserId] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
       useEffect(() => {
+        // localStorage에서 인증 정보 확인
         const token = localStorage.getItem('accessToken');
         const loginId = localStorage.getItem('loginId');
+        const storedUserId = localStorage.getItem('userId');
+
         if (token && loginId) {
           setIsLoggedIn(true);
-          setUserId(loginId);
+          setDisplayName(loginId); // UI 표시용
+          setUserId(storedUserId || ''); // API 요청용
         }
       }, []);
 
@@ -30,23 +53,38 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
         }
       };
 
-      // 로그아웃 처리
+      /**
+       * 로그아웃 처리
+       *
+       * 동작:
+       * 1. 서버에 로그아웃 요청 (refresh 토큰 삭제)
+       * 2. localStorage에서 모든 인증 정보 삭제
+       * 3. 홈으로 리다이렉트
+       *
+       * 참고: 서버 요청 실패해도 클라이언트 측 로그아웃은 진행
+       */
       const handleLogout = async () => {
         try {
           const res = await fetch("http://localhost:8080/api/logout", {
             method: "POST",
-            credentials: "include",
+            credentials: "include", // HttpOnly 쿠키(refresh token) 삭제 위해 필요
           });
-          if (res.ok) {
-            setIsLoggedIn(false);
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("loginId");
-            router.push("/");
-          } else {
-            console.log("로그아웃 실패:", await res.text());
+
+          if (!res.ok) {
+            console.warn("⚠️ 서버 로그아웃 실패:", await res.text());
           }
         } catch (err) {
-          console.log("로그아웃 요청 실패:", err);
+          console.warn("⚠️ 로그아웃 요청 실패:", err);
+        } finally {
+          // 서버 요청 결과와 관계없이 클라이언트 측 로그아웃 처리
+          setIsLoggedIn(false);
+          // 모든 인증 관련 localStorage 데이터 삭제
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("userId");
+          localStorage.removeItem("loginId");
+          localStorage.removeItem("role");
+          console.log("✅ 로그아웃 완료");
+          router.push("/");
         }
       };
   return (
@@ -95,14 +133,15 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
           <div className="hidden md:flex items-center space-x-4">
             {isLoggedIn ? (
               <div className="flex items-center space-x-4">
-                {/* 알림 아이콘 */}
+                {/* 알림 아이콘 - userId(숫자)를 전달하여 API 호출에 사용 */}
                 <NotificationDropdown userId={userId} />
 
                 <button
                   onClick={() => router.push("/mypage")}
                   className="flex items-center space-x-2 hover:text-gray-900 transition-colors">
                   <User className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm text-gray-700">{userId}님</span>
+                  {/* displayName(loginId)을 표시 */}
+                  <span className="text-sm text-gray-700">{displayName}님</span>
                 </button>
                 <span className="text-gray-300">|</span>
                 <button
@@ -184,7 +223,8 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
                     }}
                     className="flex items-center space-x-2 hover:text-blue-600 transition-colors">
                     <User className="w-5 h-5 text-gray-600" />
-                    <span className="text-gray-700">{userId}님</span>
+                    {/* displayName(loginId)을 표시 */}
+                    <span className="text-gray-700">{displayName}님</span>
                   </button>
                   <div className="flex items-center space-x-2">
                     {/* 모바일 알림 아이콘 */}

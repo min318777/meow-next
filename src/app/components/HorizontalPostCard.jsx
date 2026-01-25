@@ -1,6 +1,14 @@
+"use client";
 import { useRouter } from "next/navigation";
 
-const PostCard = ({ post, onLike, basePath = "/boast" }) => {
+/**
+ * HorizontalPostCard - 가로 스크롤 영역에서 사용하는 카드 컴포넌트
+ * PostCard와 동일한 UI 스타일 적용
+ *
+ * @param {Object} post - 게시글 데이터
+ * @param {string} basePath - 상세 페이지 경로 (/boast 또는 /lost)
+ */
+const HorizontalPostCard = ({ post, basePath = "/boast" }) => {
   const router = useRouter();
 
   // 고양이 찾기글인지 확인
@@ -13,27 +21,12 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
     return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
   };
 
-  // 디버깅: 게시물 데이터 확인
-  console.log("PostCard 데이터:", {
-    id: post.id,
-    title: post.title,
-    view: post.view,
-    likes: post.likes,
-    commentList: post.commentDtoList,
-    imageUrls: post.imageUrls,
-    isLostCat,
-    catName: post.catName,
-    lostLocation: post.lostLocation,
-    reward: post.reward,
-    createdAt: post.createdAt
-  });
-
-  // 고양이 찾기글 레이아웃 - 자랑글과 동일한 심플 스타일
+  // 고양이 찾기글 레이아웃
   if (isLostCat) {
     return (
       <div
         onClick={() => router.push(`${basePath}/${post.id}`)}
-        className="cursor-pointer group"
+        className="flex-shrink-0 w-48 cursor-pointer group"
       >
         {/* 이미지 영역 - 정사각형 비율 */}
         <div className="relative aspect-square overflow-hidden rounded-lg mb-2">
@@ -43,13 +36,12 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
               alt={post.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               onError={(e) => {
-                console.error("이미지 로드 실패:", post.imageUrls[0]);
                 e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect fill='%23f3f4f6' width='400' height='400'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='18' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3E이미지 없음%3C/text%3E%3C/svg%3E";
               }}
             />
           ) : (
             <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-              <span className="text-gray-400">이미지 없음</span>
+              <span className="text-gray-400 text-sm">이미지 없음</span>
             </div>
           )}
         </div>
@@ -68,11 +60,11 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
     );
   }
 
-  // 고양이 자랑글 레이아웃 - 심플한 카드 스타일
+  // 고양이 자랑글 레이아웃
   return (
     <div
       onClick={() => router.push(`${basePath}/${post.id}`)}
-      className="cursor-pointer group"
+      className="flex-shrink-0 w-48 cursor-pointer group"
     >
       {/* 이미지 영역 - 정사각형 비율 */}
       <div className="relative aspect-square overflow-hidden rounded-lg mb-2">
@@ -82,13 +74,12 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
             alt={post.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={(e) => {
-              console.error("이미지 로드 실패:", post.imageUrls[0]);
               e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect fill='%23f3f4f6' width='400' height='400'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='18' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3E이미지 없음%3C/text%3E%3C/svg%3E";
             }}
           />
         ) : (
           <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-            <span className="text-gray-400">이미지 없음</span>
+            <span className="text-gray-400 text-sm">이미지 없음</span>
           </div>
         )}
       </div>
@@ -110,4 +101,4 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
   );
 };
 
-export default PostCard;
+export default HorizontalPostCard;

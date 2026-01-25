@@ -13,30 +13,66 @@ export default function LoginPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  /**
+   * 로그인 처리 함수
+   *
+   * 백엔드 CustomLoginFilter 응답 형식:
+   * - 성공: { success: true, accessToken: "...", userId: 123, role: "USER" }
+   * - 실패: { success: false, message: "에러 메시지" }
+   *
+   * 저장하는 값:
+   * - accessToken: JWT 액세스 토큰 (Authorization 헤더에 사용)
+   * - userId: 사용자 고유 ID (숫자, API 요청에 사용)
+   * - loginId: 로그인에 사용한 아이디 (UI 표시용)
+   * - role: 사용자 권한 (USER, ADMIN 등)
+   *
+   * refresh 토큰은 HttpOnly 쿠키로 자동 저장됨 (credentials: "include")
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:8080/api/users/login", {
+      // CustomLoginFilter는 /login 엔드포인트에서 동작
+      const res = await fetch("http://localhost:8080/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // refresh 토큰 쿠키로 받기
+        credentials: "include", // refresh 토큰 쿠키로 받기 (HttpOnly)
         body: JSON.stringify(form),
       });
 
       const data = await res.json();
-      if (res.ok) {
-        // accessToken을 로컬스토리지에 저장 (백엔드가 바디나 헤더로 줄 경우)
-        if (data.accessToken && data.loginId) {
+
+      if (res.ok && data.success) {
+        // 백엔드 응답에서 토큰과 사용자 정보 저장
+        // accessToken: JWT 토큰
+        // userId: 숫자형 사용자 ID (API 요청에 사용)
+        // loginId: 로그인 아이디 (UI 표시용)
+        // role: 사용자 권한
+        if (data.accessToken) {
           localStorage.setItem("accessToken", data.accessToken);
-          localStorage.setItem("loginId", data.loginId);
         }
+        if (data.userId) {
+          localStorage.setItem("userId", String(data.userId));
+        }
+        if (data.role) {
+          localStorage.setItem("role", data.role);
+        }
+        // 로그인 아이디도 저장 (UI 표시용)
+        localStorage.setItem("loginId", form.loginId);
+
+        console.log("✅ 로그인 성공:", {
+          userId: data.userId,
+          role: data.role,
+          loginId: form.loginId
+        });
+
         window.location.href = "/";
       } else {
+        // 로그인 실패 메시지 표시
         alert(`로그인 실패: ${data.message || "아이디 또는 비밀번호를 확인하세요"}`);
       }
     } catch (err) {
-      console.error(err);
-      alert("로그인 중 오류 발생");
+      console.error("❌ 로그인 중 오류:", err);
+      alert("로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     }
   };
 

@@ -3,10 +3,27 @@
  *
  * 이 유틸리티는 다음과 같은 기능을 제공합니다:
  * 1. API 요청 시 자동으로 Authorization 헤더 추가
- * 2. 401/403 에러 발생 시 자동으로 토큰 재발급 시도
+ * 2. 401 에러 발생 시 에러 코드 확인 후 자동 토큰 재발급 시도
  * 3. 재발급 성공 시 원래 요청 자동 재시도
  * 4. 재발급 실패 시 로그인 페이지로 리다이렉트
+ *
+ * 백엔드 JwtFilter 에러 응답 형식:
+ * - TOKEN_EXPIRED: 토큰 만료 -> 재발급 시도
+ * - INVALID_TOKEN: 유효하지 않은 토큰 -> 재로그인 필요
+ * - INVALID_ACCESS_TOKEN: Access 토큰이 아님 -> 재로그인 필요
+ * - USER_NOT_FOUND: 사용자를 찾을 수 없음 -> 재로그인 필요
  */
+
+/**
+ * localStorage에서 모든 인증 관련 데이터 삭제
+ * 로그아웃 또는 토큰 만료 시 호출
+ */
+function clearAuthData() {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("userId");
+  localStorage.removeItem("loginId");
+  localStorage.removeItem("role");
+}
 
 /**
  * Refresh 토큰을 이용한 Access 토큰 재발급
@@ -14,9 +31,10 @@
  * @returns {Promise<boolean>} 재발급 성공 여부
  *
  * 동작 원리:
- * - 쿠키에 저장된 refresh 토큰을 이용하여 /api/reissue 엔드포인트 호출
+ * - 쿠키에 저장된 refresh 토큰(HttpOnly)을 이용하여 /api/reissue 엔드포인트 호출
  * - 서버는 새로운 accessToken을 Authorization 헤더로 반환
  * - 새 토큰을 localStorage에 저장
+ * - refresh 토큰도 갱신되어 쿠키에 자동 저장됨
  */
 async function refreshAccessToken() {
   try {
@@ -24,7 +42,7 @@ async function refreshAccessToken() {
 
     const response = await fetch("http://localhost:8080/api/reissue", {
       method: "POST",
-      credentials: "include", // 쿠키(refresh token) 포함
+      credentials: "include", // HttpOnly 쿠키(refresh token) 자동 포함
     });
 
     if (response.ok) {
@@ -43,11 +61,40 @@ async function refreshAccessToken() {
       }
     }
 
-    console.error("❌ 토큰 재발급 실패: 응답 헤더에 Authorization이 없음");
+    console.error("❌ 토큰 재발급 실패: 응답 상태 코드", response.status);
     return false;
   } catch (error) {
     console.error("❌ 토큰 재발급 중 오류:", error);
     return false;
+  }
+}
+
+/**
+ * 401 에러 응답에서 에러 코드 확인
+ * TOKEN_EXPIRED인 경우에만 재발급 시도
+ *
+ * @param {Response} response - fetch 응답 객체
+ * @returns {Promise<{shouldRefresh: boolean, errorCode: string}>}
+ */
+async function checkAuthError(response) {
+  try {
+    const clonedResponse = response.clone();
+    const errorData = await clonedResponse.json();
+
+    // 백엔드 JwtFilter 에러 응답: { error: "ERROR_CODE", message: "...", status: 401 }
+    const errorCode = errorData.error || "";
+
+    // TOKEN_EXPIRED인 경우에만 재발급 시도
+    if (errorCode === "TOKEN_EXPIRED") {
+      return { shouldRefresh: true, errorCode };
+    }
+
+    // 그 외 에러 코드는 재로그인 필요
+    // INVALID_TOKEN, INVALID_ACCESS_TOKEN, USER_NOT_FOUND 등
+    return { shouldRefresh: false, errorCode };
+  } catch (e) {
+    // JSON 파싱 실패 시 재발급 시도
+    return { shouldRefresh: true, errorCode: "UNKNOWN" };
   }
 }
 
@@ -134,8 +181,7 @@ export async function authFetch(url, options = {}) {
       } else {
         // 재발급 실패 - 로그인 페이지로 리다이렉트
         console.error("❌ 토큰 재발급 실패. 로그인 페이지로 이동합니다.");
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("loginId");
+        clearAuthData();
         window.location.href = "/signin";
         throw new Error("인증이 만료되었습니다. 다시 로그인해주세요.");
       }
@@ -231,8 +277,7 @@ export async function authPostFormData(url, formData) {
           credentials: "include",
         });
       } else {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("loginId");
+        clearAuthData();
         window.location.href = "/signin";
         throw new Error("인증이 만료되었습니다. 다시 로그인해주세요.");
       }
@@ -386,8 +431,7 @@ export async function authPutFormData(url, formData) {
 
         return retryResponse.json();
       } else {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("loginId");
+        clearAuthData();
         window.location.href = "/signin";
         throw new Error("인증이 만료되었습니다. 다시 로그인해주세요.");
       }
