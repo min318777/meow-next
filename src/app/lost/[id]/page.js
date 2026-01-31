@@ -209,7 +209,23 @@ export default function LostDetailPage() {
     const fetchDetail = async () => {
       try {
         const data = await publicGet(`http://localhost:8080/api/meow/lost-cat/${id}`);
-        setPost(data.data);
+        const postData = data.data;
+        setPost(postData);
+
+        // 조회수 증가: 작성자가 아닌 경우에만 호출
+        // localStorage에서 현재 로그인한 사용자 ID 가져오기
+        const loginId = localStorage.getItem("loginId");
+        const postWriter = postData.writer || postData.loginId;
+
+        // 로그인하지 않았거나, 로그인한 사용자가 작성자가 아닌 경우에만 조회수 증가
+        if (!loginId || loginId !== postWriter) {
+          try {
+            await authPost(`http://localhost:8080/api/meow/lost-cat/${id}/view`, {});
+          } catch (viewErr) {
+            // 조회수 증가 실패는 무시 (사용자 경험에 영향 없음)
+            console.error("조회수 증가 실패:", viewErr);
+          }
+        }
       } catch (err) {
         console.error("상세 조회 실패:", err);
       }

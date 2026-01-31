@@ -11,7 +11,9 @@
       "Bash(cmd.exe /c \"taskkill /PID 29132 /F\")",
       "Bash(powershell -Command \"Stop-Process -Id 29132 -Force\")",
       "Bash(powershell -Command \"Stop-Process -Id 32628 -Force\")",
-      "Bash(powershell -Command \"Stop-Process -Id 40528 -Force\")"
+      "Bash(powershell -Command \"Stop-Process -Id 40528 -Force\")",
+      "Bash(cmd.exe /c \"taskkill /PID 25912 /F\")",
+      "Bash(powershell -Command \"Stop-Process -Id 25912 -Force\")"
     ]
   },
   "statusLine": {

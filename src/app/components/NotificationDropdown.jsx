@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Bell, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { authGet, authPatch, refreshAccessToken } from "../utils/authFetch";
 
 /**
  * 알림 드롭다운 컴포넌트
@@ -50,12 +51,27 @@ const NotificationDropdown = ({ userId }) => {
     let isConnecting = false;
     let shouldReconnect = true;
 
-    // SSE 연결 함수
-    const connectSSE = async () => {
+    // SSE 연결 함수 (토큰 재발급 지원)
+    const connectSSE = async (retryCount = 0) => {
       if (isConnecting) return;
       isConnecting = true;
 
       try {
+        // 최신 토큰 가져오기
+        let currentToken = localStorage.getItem("accessToken");
+
+        if (!currentToken) {
+          console.warn("⚠️ SSE: accessToken이 없습니다. 재발급 시도...");
+          const newToken = await refreshAccessToken();
+          if (newToken) {
+            currentToken = newToken;
+          } else {
+            console.error("❌ SSE: 토큰 재발급 실패, 연결 중단");
+            isConnecting = false;
+            return;
+          }
+        }
+
         console.log("📡 SSE 연결 시도 - User:", userId);
 
         // fetch API로 SSE 연결 (EventSource는 커스텀 헤더 지원 안 함)
@@ -64,10 +80,28 @@ const NotificationDropdown = ({ userId }) => {
         const response = await fetch("http://localhost:8080/api/notice/subscribe", {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${currentToken}`,
           },
           credentials: "include",
         });
+
+        // 401/403 에러 시 토큰 재발급 후 재연결 시도
+        if (response.status === 401 || response.status === 403) {
+          console.warn("⚠️ SSE: 토큰 만료, 재발급 시도...");
+          isConnecting = false;
+
+          // 최대 1번만 재시도
+          if (retryCount < 1) {
+            const newToken = await refreshAccessToken();
+            if (newToken) {
+              console.log("✅ SSE: 토큰 재발급 성공, 재연결 시도...");
+              return connectSSE(retryCount + 1);
+            }
+          }
+
+          console.error("❌ SSE: 토큰 재발급 실패, 연결 중단");
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(`SSE 연결 실패: ${response.status}`);
@@ -215,180 +249,70 @@ const NotificationDropdown = ({ userId }) => {
     };
   }, [userId]);
 
-  // 알림 목록 조회 API
+  // 알림 목록 조회 API (authGet 사용 - 토큰 자동 재발급 지원)
   const fetchNotifications = async () => {
     try {
-      const accessToken = localStorage.getItem("accessToken");
-      // 백엔드 API: /api/notice (페이징 지원: page, size)
-      // notification 모듈은 8080 포트에서 실행됨
-      const response = await fetch("http://localhost:8080/api/notice?page=0&size=20", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        credentials: "include",
+      // authGet은 토큰 만료 시 자동으로 재발급 후 재시도함
+      const data = await authGet("http://localhost:8080/api/notice?page=0&size=20");
+      console.log("📋 알림 목록 조회 원본 데이터:", data);
+
+      // Spring Page 응답 구조: { content: [...], totalPages, totalElements, ... }
+      const notificationList = data.content || [];
+
+      // 백엔드 응답 구조 확인 (필드명 디버깅)
+      if (notificationList.length > 0) {
+        console.log("📋 첫 번째 알림 데이터 샘플:", notificationList[0]);
+        console.log("📋 isRead 필드 확인:", {
+          isRead: notificationList[0].isRead,
+          is_read: notificationList[0].is_read,
+          read: notificationList[0].read
+        });
+      }
+
+      setNotifications(notificationList);
+
+      // 읽지 않은 알림 개수 계산 (여러 필드명 형식 지원)
+      const unread = notificationList.filter((n) => {
+        // isRead, is_read, read 등 다양한 필드명 형식 지원
+        const isRead = n.isRead ?? n.is_read ?? n.read ?? false;
+        return !isRead;
+      }).length;
+
+      console.log("📋 알림 통계:", {
+        전체알림수: notificationList.length,
+        읽지않은알림수: unread,
+        읽은알림수: notificationList.length - unread
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log("📋 알림 목록 조회 원본 데이터:", data);
-
-        // Spring Page 응답 구조: { content: [...], totalPages, totalElements, ... }
-        const notificationList = data.content || [];
-
-        // 백엔드 응답 구조 확인 (필드명 디버깅)
-        if (notificationList.length > 0) {
-          console.log("📋 첫 번째 알림 데이터 샘플:", notificationList[0]);
-          console.log("📋 isRead 필드 확인:", {
-            isRead: notificationList[0].isRead,
-            is_read: notificationList[0].is_read,
-            read: notificationList[0].read
-          });
-        }
-
-        setNotifications(notificationList);
-
-        // 읽지 않은 알림 개수 계산 (여러 필드명 형식 지원)
-        const unread = notificationList.filter((n) => {
-          // isRead, is_read, read 등 다양한 필드명 형식 지원
-          const isRead = n.isRead ?? n.is_read ?? n.read ?? false;
-          return !isRead;
-        }).length;
-
-        console.log("📋 알림 통계:", {
-          전체알림수: notificationList.length,
-          읽지않은알림수: unread,
-          읽은알림수: notificationList.length - unread
-        });
-
-        setUnreadCount(unread);
-      } else if (response.status === 403) {
-        console.warn("⚠️ 알림 API 접근 권한 없음 (백엔드 API 미구현 가능성)");
-        // 빈 배열로 초기화하여 UI는 정상 작동하도록 함
-        setNotifications([]);
-        setUnreadCount(0);
-      } else {
-        console.warn(`⚠️ 알림 목록 조회 실패: ${response.status}`);
-        setNotifications([]);
-        setUnreadCount(0);
-      }
+      setUnreadCount(unread);
     } catch (error) {
-      console.warn("⚠️ 알림 조회 에러 (백엔드 서버 미응답):", error.message);
-      // 네트워크 에러 시에도 빈 배열로 초기화
+      console.warn("⚠️ 알림 조회 에러:", error.message);
+      // 에러 시 빈 배열로 초기화하여 UI는 정상 작동하도록 함
       setNotifications([]);
       setUnreadCount(0);
     }
   };
 
-  // 알림 읽음 처리
+  // 알림 읽음 처리 (authPatch 사용 - 토큰 자동 재발급 지원)
   const markAsRead = async (notificationId) => {
     try {
-      const accessToken = localStorage.getItem("accessToken");
-
-      console.log("📝 단일 알림 읽음 처리 시작:", {
-        notificationId,
-        userId,
-        hasToken: !!accessToken,
-        tokenPreview: accessToken ? accessToken.substring(0, 20) + "..." : "없음"
-      });
-
-      // notification 모듈은 8080 포트에서 실행됨
       const url = `http://localhost:8080/api/notice/${notificationId}/read`;
-      console.log("📡 요청 URL:", url);
+      console.log("📝 단일 알림 읽음 처리 시작:", { notificationId, userId });
 
-      // 백엔드는 JWT 토큰에서 자동으로 사용자 정보 추출 (@AuthenticationPrincipal)
-      const response = await fetch(url, {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
+      // authPatch는 토큰 만료 시 자동으로 재발급 후 재시도함
+      await authPatch(url);
+      console.log("✅ 단일 알림 읽음 처리 성공");
 
-      console.log("📝 API 응답:", {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
-      if (response.ok) {
-        // Content-Type 확인
-        const contentType = response.headers.get("content-type");
-        console.log("📄 응답 Content-Type:", contentType);
-
-        let data;
-        if (contentType && contentType.includes("application/json")) {
-          data = await response.json();
-          console.log("✅ 단일 알림 읽음 처리 성공:", data);
-        } else {
-          const text = await response.text();
-          console.log("✅ 단일 알림 읽음 처리 성공 (텍스트):", text);
-          data = { success: true };
-        }
-
-        // 로컬 상태 업데이트
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notificationId ? { ...n, isRead: true } : n
-          )
-        );
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-      } else {
-        // 에러 응답 상세 분석
-        let errorText = "";
-        let errorDetail = null;
-
-        try {
-          // JSON 응답 시도
-          const errorJson = await response.json();
-          errorDetail = errorJson;
-          errorText = JSON.stringify(errorJson, null, 2);
-          console.error("❌ 알림 읽음 처리 실패 (JSON 응답):", {
-            status: response.status,
-            statusText: response.statusText,
-            responseData: errorJson
-          });
-        } catch (jsonError) {
-          // JSON 파싱 실패 시 텍스트로 읽기
-          try {
-            errorText = await response.text();
-            console.error("❌ 알림 읽음 처리 실패 (텍스트 응답):", {
-              status: response.status,
-              statusText: response.statusText,
-              responseText: errorText,
-              jsonParseError: jsonError.message
-            });
-          } catch (textError) {
-            console.error("❌ 알림 읽음 처리 실패 (응답 읽기 실패):", {
-              status: response.status,
-              statusText: response.statusText,
-              jsonError: jsonError.message,
-              textError: textError.message
-            });
-          }
-        }
-
-        console.error("❌ 읽음 처리 실패 상세 정보:", {
-          url: url,
-          method: "PATCH",
-          status: response.status,
-          statusText: response.statusText,
-          userId: userId,
-          notificationId: notificationId,
-          hasAuthToken: !!localStorage.getItem("accessToken"),
-          responseHeaders: Object.fromEntries(response.headers.entries())
-        });
-
-        alert(`알림 읽음 처리 실패\n상태: ${response.status} ${response.statusText}\n메시지: ${errorText.substring(0, 200) || '응답 본문 없음'}`);
-      }
+      // 로컬 상태 업데이트
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notificationId ? { ...n, isRead: true } : n
+        )
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
-      console.error("❌ 알림 읽음 처리 예외 발생:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-      alert(`알림 읽음 처리 에러\n${error.name}: ${error.message}`);
+      console.error("❌ 알림 읽음 처리 실패:", error.message);
+      // 사용자에게 에러 알림 (선택적)
     }
   };
 
@@ -525,115 +449,24 @@ const NotificationDropdown = ({ userId }) => {
             )}
           </div>
 
-          {/* 모두 읽음 처리 버튼 (선택사항) */}
+          {/* 모두 읽음 처리 버튼 (authPatch 사용 - 토큰 자동 재발급 지원) */}
           {notifications.length > 0 && unreadCount > 0 && (
             <div className="p-3 border-t border-gray-200">
               <button
                 onClick={async () => {
-                  // 모든 알림 읽음 처리 API 호출
                   try {
-                    const accessToken = localStorage.getItem("accessToken");
+                    console.log("📝 전체 알림 읽음 처리 시작:", { userId, unreadCount });
 
-                    console.log("📝 전체 알림 읽음 처리 시작:", {
-                      userId,
-                      hasToken: !!accessToken,
-                      unreadCount,
-                      tokenPreview: accessToken ? accessToken.substring(0, 20) + "..." : "없음"
-                    });
+                    // authPatch는 토큰 만료 시 자동으로 재발급 후 재시도함
+                    await authPatch("http://localhost:8080/api/notice/read-all");
+                    console.log("✅ 전체 알림 읽음 처리 성공");
 
-                    // notification 모듈은 8080 포트에서 실행됨
-                    const url = "http://localhost:8080/api/notice/read-all";
-                    console.log("📡 요청 URL:", url);
-
-                    // 백엔드는 JWT 토큰에서 자동으로 사용자 정보 추출 (@AuthenticationPrincipal)
-                    const response = await fetch(url, {
-                      method: "PATCH",
-                      headers: {
-                        "Authorization": `Bearer ${accessToken}`,
-                        "Content-Type": "application/json",
-                      },
-                      credentials: "include",
-                    });
-
-                    console.log("📝 전체 읽음 API 응답:", {
-                      status: response.status,
-                      statusText: response.statusText,
-                      ok: response.ok,
-                      headers: Object.fromEntries(response.headers.entries())
-                    });
-
-                    if (response.ok) {
-                      const contentType = response.headers.get("content-type");
-                      console.log("📄 응답 Content-Type:", contentType);
-
-                      let data;
-                      if (contentType && contentType.includes("application/json")) {
-                        data = await response.json();
-                        console.log("✅ 전체 알림 읽음 처리 성공:", data);
-                      } else {
-                        const text = await response.text();
-                        console.log("✅ 전체 알림 읽음 처리 성공 (텍스트):", text);
-                        data = { success: true };
-                      }
-
-                      setNotifications((prev) =>
-                        prev.map((n) => ({ ...n, isRead: true }))
-                      );
-                      setUnreadCount(0);
-                    } else {
-                      // 에러 응답 상세 분석
-                      let errorText = "";
-                      let errorDetail = null;
-
-                      try {
-                        // JSON 응답 시도
-                        const errorJson = await response.json();
-                        errorDetail = errorJson;
-                        errorText = JSON.stringify(errorJson, null, 2);
-                        console.error("❌ 전체 알림 읽음 처리 실패 (JSON 응답):", {
-                          status: response.status,
-                          statusText: response.statusText,
-                          responseData: errorJson
-                        });
-                      } catch (jsonError) {
-                        // JSON 파싱 실패 시 텍스트로 읽기
-                        try {
-                          errorText = await response.text();
-                          console.error("❌ 전체 알림 읽음 처리 실패 (텍스트 응답):", {
-                            status: response.status,
-                            statusText: response.statusText,
-                            responseText: errorText,
-                            jsonParseError: jsonError.message
-                          });
-                        } catch (textError) {
-                          console.error("❌ 전체 알림 읽음 처리 실패 (응답 읽기 실패):", {
-                            status: response.status,
-                            statusText: response.statusText,
-                            jsonError: jsonError.message,
-                            textError: textError.message
-                          });
-                        }
-                      }
-
-                      console.error("❌ 전체 읽음 처리 실패 상세 정보:", {
-                        url: url,
-                        method: "PATCH",
-                        status: response.status,
-                        statusText: response.statusText,
-                        userId: userId,
-                        hasAuthToken: !!localStorage.getItem("accessToken"),
-                        responseHeaders: Object.fromEntries(response.headers.entries())
-                      });
-
-                      alert(`전체 알림 읽음 처리 실패\n상태: ${response.status} ${response.statusText}\n메시지: ${errorText.substring(0, 200) || '응답 본문 없음'}`);
-                    }
+                    setNotifications((prev) =>
+                      prev.map((n) => ({ ...n, isRead: true }))
+                    );
+                    setUnreadCount(0);
                   } catch (error) {
-                    console.error("❌ 전체 알림 읽음 처리 예외 발생:", {
-                      name: error.name,
-                      message: error.message,
-                      stack: error.stack
-                    });
-                    alert(`전체 알림 읽음 처리 에러\n${error.name}: ${error.message}`);
+                    console.error("❌ 전체 알림 읽음 처리 실패:", error.message);
                   }
                 }}
                 className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium"
