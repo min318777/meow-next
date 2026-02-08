@@ -3,45 +3,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import TiptapEditor from "../components/TiptapEditor";
-import { authPostFormData } from "../utils/authFetch";
+import { authPost } from "../utils/authFetch";
+import { processEditorContent } from "../utils/imageUpload";
 
 export default function CreateBoastCatPostPage() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState(""); // HTML 형태로 저장됨
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  // HTML에서 base64 이미지를 추출하는 함수
-  const extractImagesFromHTML = (html) => {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-    const images = doc.querySelectorAll("img");
-    const imageFiles = [];
-    const imagePlaceholders = new Map();
-
-    images.forEach((img, index) => {
-      const src = img.getAttribute("src");
-      if (src && src.startsWith("data:image")) {
-        // base64를 File 객체로 변환
-        const arr = src.split(",");
-        const mime = arr[0].match(/:(.*?);/)[1];
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const file = new File([u8arr], `image-${index}.${mime.split("/")[1]}`, { type: mime });
-        imageFiles.push(file);
-
-        // 이미지를 플레이스홀더로 교체
-        imagePlaceholders.set(src, `[IMAGE:${index}]`);
-        img.setAttribute("src", `[IMAGE:${index}]`);
-      }
-    });
-
-    return { imageFiles, modifiedHTML: doc.body.innerHTML };
-  };
+  const [isSubmitting, setIsSubmitting] = useState(false); // 제출 중 상태
 
   // 제출
   const handleSubmit = async (e) => {
@@ -57,24 +27,31 @@ export default function CreateBoastCatPostPage() {
       return;
     }
 
+    // 중복 제출 방지
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     try {
-      // HTML에서 이미지 추출
-      const { imageFiles, modifiedHTML } = extractImagesFromHTML(content);
+      // 1단계: 에디터 콘텐츠에서 이미지 추출 및 S3 업로드
+      // - base64 이미지를 File 객체로 변환
+      // - Presigned URL로 S3에 업로드
+      // - 이미지 key 배열 반환
+      const { content: processedContent, imageKeys } =
+        await processEditorContent(content);
 
-      // FormData 생성
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("content", modifiedHTML); // 플레이스홀더가 포함된 HTML
+      // 2단계: 게시글 생성 API 호출 (JSON 형식)
+      // 새로운 API는 FormData가 아닌 JSON으로 imageKeys를 받음
+      const requestBody = {
+        title: title,
+        content: processedContent, // 플레이스홀더가 포함된 HTML
+        imageKeys: imageKeys, // S3에 업로드된 이미지의 key 배열
+      };
 
-      // 이미지 파일들 추가
-      imageFiles.forEach((file) => {
-        formData.append("images", file);
-      });
+      console.log("📤 게시글 생성 요청:", requestBody);
 
-      // authPostFormData 함수를 사용하여 자동 토큰 재발급 적용
-      const data = await authPostFormData(
+      const data = await authPost(
         "http://localhost:8080/api/meow/boast-cat",
-        formData
+        requestBody
       );
 
       if (data.status === "OK") {
@@ -84,8 +61,10 @@ export default function CreateBoastCatPostPage() {
         alert(`등록 실패: ${data.message}`);
       }
     } catch (err) {
-      console.error(err);
+      console.error("등록 중 오류:", err);
       alert("등록 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -101,7 +80,9 @@ export default function CreateBoastCatPostPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 제목 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                제목
+              </label>
               <input
                 type="text"
                 value={title}
@@ -109,12 +90,15 @@ export default function CreateBoastCatPostPage() {
                 placeholder="제목을 입력하세요"
                 className="mt-1 w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
             {/* 내용 - Tiptap 에디터 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                내용
+              </label>
               <TiptapEditor
                 content={content}
                 onChange={setContent}
@@ -125,9 +109,14 @@ export default function CreateBoastCatPostPage() {
             {/* 제출 버튼 */}
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium text-lg"
+              disabled={isSubmitting}
+              className={`w-full py-3 rounded-lg transition-colors font-medium text-lg ${
+                isSubmitting
+                  ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
             >
-              등록하기
+              {isSubmitting ? "등록 중..." : "등록하기"}
             </button>
           </form>
         </div>

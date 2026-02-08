@@ -50,11 +50,14 @@ export default function Page() {
         const lostData = lostRes.ok ? await lostRes.json() : { data: { content: [] } };
 
         // 자랑글: 날짜 최신순 정렬
-        const sortedBoastPosts = (boastData.data?.content || [])
+        // 서버 응답 구조: ApiResponse<PageResponse<T>> = { status, message, data: { data: [...], page, totalElements, ... } }
+        const boastContent = boastData.data?.data || boastData.data?.content || boastData.content || [];
+        const sortedBoastPosts = boastContent
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         // 찾기글: 날짜 최신순 정렬
-        const sortedLostPosts = (lostData.data?.content || [])
+        const lostContent = lostData.data?.data || lostData.data?.content || lostData.content || [];
+        const sortedLostPosts = lostContent
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         setBoastPosts(sortedBoastPosts);
