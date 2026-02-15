@@ -2,24 +2,24 @@
 import { useState, useEffect, useRef } from "react";
 import { Bell, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { authGet, authPatch, refreshAccessToken } from "../utils/authFetch";
+import { useNotification } from "../contexts/NotificationContext";
 
 /**
  * 알림 드롭다운 컴포넌트
- * 주요 기능:
- * 1. SSE(Server-Sent Events)로 실시간 알림 수신
- * 2. 읽지 않은 알림 개수 뱃지 표시
- * 3. 드롭다운 클릭 시 알림 목록 표시
- * 4. 알림 클릭 시 해당 게시글로 이동
- * 5. 알림 읽음 처리
+ * NotificationContext를 사용하여 전역 SSE 연결 상태 공유
  */
-const NotificationDropdown = ({ userId }) => {
+const NotificationDropdown = () => {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef(null);
-  const eventSourceRef = useRef(null);
+
+  // Context에서 알림 상태 가져오기
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+  } = useNotification();
 
   // 외부 클릭 감지 (드롭다운 닫기)
   useEffect(() => {
@@ -33,310 +33,24 @@ const NotificationDropdown = ({ userId }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 알림 목록 초기 로드
-  useEffect(() => {
-    if (userId) {
-      fetchNotifications();
-    }
-  }, [userId]);
-
-  // SSE 연결 설정 (실시간 알림 수신)
-  useEffect(() => {
-    if (!userId) return;
-
-    const accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) return;
-
-    let readerRef = null;
-    let isConnecting = false;
-    let shouldReconnect = true;
-
-    // SSE 연결 함수 (토큰 재발급 지원)
-    const connectSSE = async (retryCount = 0) => {
-      if (isConnecting) return;
-      isConnecting = true;
-
-      try {
-        // 최신 토큰 가져오기
-        let currentToken = localStorage.getItem("accessToken");
-
-        if (!currentToken) {
-          console.warn("⚠️ SSE: accessToken이 없습니다. 재발급 시도...");
-          const newToken = await refreshAccessToken();
-          if (newToken) {
-            currentToken = newToken;
-          } else {
-            console.error("❌ SSE: 토큰 재발급 실패, 연결 중단");
-            isConnecting = false;
-            return;
-          }
-        }
-
-        console.log("📡 SSE 연결 시도 - User:", userId);
-
-        // fetch API로 SSE 연결 (EventSource는 커스텀 헤더 지원 안 함)
-        // notification 모듈은 8080 포트에서 실행됨
-        // 백엔드는 JWT 토큰에서 자동으로 사용자 정보 추출 (@AuthenticationPrincipal)
-        const response = await fetch("http://localhost:8080/api/notice/subscribe", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${currentToken}`,
-          },
-          credentials: "include",
-        });
-
-        // 401/403 에러 시 토큰 재발급 후 재연결 시도
-        if (response.status === 401 || response.status === 403) {
-          console.warn("⚠️ SSE: 토큰 만료, 재발급 시도...");
-          isConnecting = false;
-
-          // 최대 1번만 재시도
-          if (retryCount < 1) {
-            const newToken = await refreshAccessToken();
-            if (newToken) {
-              console.log("✅ SSE: 토큰 재발급 성공, 재연결 시도...");
-              return connectSSE(retryCount + 1);
-            }
-          }
-
-          console.error("❌ SSE: 토큰 재발급 실패, 연결 중단");
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(`SSE 연결 실패: ${response.status}`);
-        }
-
-        // ReadableStream으로 SSE 데이터 읽기
-        const reader = response.body.getReader();
-        readerRef = reader;
-        const decoder = new TextDecoder("utf-8");
-
-        // 스트림 데이터 처리
-        const processStream = async () => {
-          let buffer = ""; // 불완전한 라인을 저장할 버퍼
-          let currentEvent = ""; // 현재 처리 중인 이벤트 타입
-
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) {
-                console.log("🔌 SSE 스트림 종료");
-                break;
-              }
-
-              // 받은 데이터를 문자열로 디코딩하고 버퍼에 추가
-              buffer += decoder.decode(value, { stream: true });
-              console.log("📦 SSE 버퍼:", buffer.substring(0, 200)); // 처음 200자만 로깅
-
-              // 완전한 라인들을 추출 (개행 문자로 분리)
-              const lines = buffer.split("\n");
-              // 마지막 요소는 불완전한 라인일 수 있으므로 버퍼에 보관
-              buffer = lines.pop() || "";
-
-              for (const line of lines) {
-                const trimmedLine = line.trim();
-                console.log("📄 SSE 라인:", JSON.stringify(trimmedLine));
-
-                // 빈 라인은 건너뛰기 (SSE 메시지 구분자)
-                if (trimmedLine === "") {
-                  continue;
-                }
-
-                // SSE 이벤트 타입 파싱 (event: notification)
-                if (trimmedLine.startsWith("event:")) {
-                  currentEvent = trimmedLine.substring(6).trim();
-                  console.log("📋 SSE 이벤트 타입:", currentEvent);
-                  continue;
-                }
-
-                // SSE 데이터 파싱 (data: {...})
-                if (trimmedLine.startsWith("data:")) {
-                  const data = trimmedLine.substring(5).trim();
-                  console.log("📊 SSE 데이터 추출:", JSON.stringify(data).substring(0, 100));
-
-                  // connect 이벤트 (연결 성공 메시지)
-                  if (currentEvent === "connect") {
-                    console.log("✅ SSE 연결 성공:", data);
-                    currentEvent = ""; // 이벤트 초기화
-                    continue;
-                  }
-
-                  // notification 이벤트 (실시간 알림)
-                  if (currentEvent === "notification") {
-                    // 빈 데이터 체크
-                    if (!data || data === "") {
-                      console.debug("⚠️ 빈 notification 데이터 수신 (무시)");
-                      currentEvent = ""; // 이벤트 초기화
-                      continue;
-                    }
-
-                    try {
-                      const notification = JSON.parse(data);
-                      console.log("📨 새 알림 수신:", notification);
-
-                      // 알림 목록에 추가 (최신 순으로)
-                      setNotifications((prev) => {
-                        console.log("🔄 알림 목록 업데이트 - 이전:", prev.length, "개");
-                        const updated = [notification, ...prev];
-                        console.log("🔄 알림 목록 업데이트 - 이후:", updated.length, "개");
-                        return updated;
-                      });
-
-                      setUnreadCount((prev) => {
-                        console.log("🔔 읽지 않은 알림 증가:", prev, "→", prev + 1);
-                        return prev + 1;
-                      });
-
-                      currentEvent = ""; // 이벤트 초기화
-                    } catch (parseError) {
-                      console.error("❌ 알림 JSON 파싱 실패:", data, parseError);
-                      currentEvent = ""; // 에러 발생 시에도 이벤트 초기화
-                    }
-                    continue;
-                  }
-
-                  // 기타 메시지 처리
-                  if (data && data !== "") {
-                    console.debug("💬 SSE 메시지:", data);
-                  }
-                }
-              }
-            }
-          } catch (streamError) {
-            console.error("⚠️ SSE 스트림 에러:", streamError);
-          }
-
-          // 스트림 종료 후 재연결
-          if (shouldReconnect) {
-            console.log("🔄 3초 후 SSE 재연결 시도...");
-            setTimeout(() => {
-              isConnecting = false;
-              connectSSE();
-            }, 3000);
-          }
-        };
-
-        processStream();
-      } catch (error) {
-        console.error("⚠️ SSE 연결 에러:", error);
-        isConnecting = false;
-
-        // 재연결 시도
-        if (shouldReconnect) {
-          console.log("🔄 5초 후 SSE 재연결 시도...");
-          setTimeout(() => {
-            connectSSE();
-          }, 5000);
-        }
-      }
-    };
-
-    // SSE 연결 시작
-    connectSSE();
-
-    // 컴포넌트 언마운트 시 연결 종료
-    return () => {
-      shouldReconnect = false;
-      if (readerRef) {
-        try {
-          readerRef.cancel();
-          console.log("🔌 SSE 연결 종료");
-        } catch (e) {
-          // 이미 닫힌 경우 무시
-        }
-      }
-    };
-  }, [userId]);
-
-  // 알림 목록 조회 API (authGet 사용 - 토큰 자동 재발급 지원)
-  const fetchNotifications = async () => {
-    try {
-      // authGet은 토큰 만료 시 자동으로 재발급 후 재시도함
-      const data = await authGet("http://localhost:8080/api/notice?page=0&size=20");
-      console.log("📋 알림 목록 조회 원본 데이터:", data);
-
-      // Spring Page 응답 구조: { content: [...], totalPages, totalElements, ... }
-      const notificationList = data.content || [];
-
-      // 백엔드 응답 구조 확인 (필드명 디버깅)
-      if (notificationList.length > 0) {
-        console.log("📋 첫 번째 알림 데이터 샘플:", notificationList[0]);
-        console.log("📋 isRead 필드 확인:", {
-          isRead: notificationList[0].isRead,
-          is_read: notificationList[0].is_read,
-          read: notificationList[0].read
-        });
-      }
-
-      setNotifications(notificationList);
-
-      // 읽지 않은 알림 개수 계산 (여러 필드명 형식 지원)
-      const unread = notificationList.filter((n) => {
-        // isRead, is_read, read 등 다양한 필드명 형식 지원
-        const isRead = n.isRead ?? n.is_read ?? n.read ?? false;
-        return !isRead;
-      }).length;
-
-      console.log("📋 알림 통계:", {
-        전체알림수: notificationList.length,
-        읽지않은알림수: unread,
-        읽은알림수: notificationList.length - unread
-      });
-
-      setUnreadCount(unread);
-    } catch (error) {
-      console.warn("⚠️ 알림 조회 에러:", error.message);
-      // 에러 시 빈 배열로 초기화하여 UI는 정상 작동하도록 함
-      setNotifications([]);
-      setUnreadCount(0);
-    }
-  };
-
-  // 알림 읽음 처리 (authPatch 사용 - 토큰 자동 재발급 지원)
-  const markAsRead = async (notificationId) => {
-    try {
-      const url = `http://localhost:8080/api/notice/${notificationId}/read`;
-      console.log("📝 단일 알림 읽음 처리 시작:", { notificationId, userId });
-
-      // authPatch는 토큰 만료 시 자동으로 재발급 후 재시도함
-      await authPatch(url);
-      console.log("✅ 단일 알림 읽음 처리 성공");
-
-      // 로컬 상태 업데이트
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notificationId ? { ...n, isRead: true } : n
-        )
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error("❌ 알림 읽음 처리 실패:", error.message);
-      // 사용자에게 에러 알림 (선택적)
-    }
-  };
-
   // 알림 클릭 핸들러 (게시글로 이동 + 읽음 처리)
   const handleNotificationClick = async (notification) => {
-    // 다양한 필드명 형식 지원 (isRead, is_read, read)
     const isRead = notification.isRead ?? notification.is_read ?? notification.read ?? false;
 
-    // 드롭다운 먼저 닫기 (빠른 사용자 경험)
+    // 드롭다운 먼저 닫기
     setIsOpen(false);
 
-    // 읽음 처리 (에러가 발생해도 게시물 이동은 진행)
+    // 읽음 처리
     if (!isRead) {
       try {
         await markAsRead(notification.id);
       } catch (error) {
-        // 읽음 처리 실패해도 게시물 이동은 진행
-        console.warn("⚠️ 알림 읽음 처리 실패했지만 게시물로 이동합니다:", error);
+        console.warn("⚠️ 알림 읽음 처리 실패:", error);
       }
     }
 
-    // 게시글로 이동 (읽음 처리 성공 여부와 무관하게 항상 실행)
+    // 게시글로 이동
     if (notification.postId) {
-      // 알림 타입에 따라 다른 페이지로 이동 가능
       router.push(`/boast/${notification.postId}`);
     }
   };
@@ -403,7 +117,6 @@ const NotificationDropdown = ({ userId }) => {
           {/* 알림 목록 */}
           <div className="divide-y divide-gray-100">
             {notifications.filter(n => {
-              // 읽지 않은 알림만 필터링
               const isRead = n.isRead ?? n.is_read ?? n.read ?? false;
               return !isRead;
             }).length === 0 ? (
@@ -413,7 +126,6 @@ const NotificationDropdown = ({ userId }) => {
             ) : (
               notifications
                 .filter((notification) => {
-                  // 읽지 않은 알림만 필터링
                   const isRead = notification.isRead ?? notification.is_read ?? notification.read ?? false;
                   return !isRead;
                 })
@@ -449,25 +161,12 @@ const NotificationDropdown = ({ userId }) => {
             )}
           </div>
 
-          {/* 모두 읽음 처리 버튼 (authPatch 사용 - 토큰 자동 재발급 지원) */}
+          {/* 모두 읽음 처리 버튼 */}
           {notifications.length > 0 && unreadCount > 0 && (
             <div className="p-3 border-t border-gray-200">
               <button
                 onClick={async () => {
-                  try {
-                    console.log("📝 전체 알림 읽음 처리 시작:", { userId, unreadCount });
-
-                    // authPatch는 토큰 만료 시 자동으로 재발급 후 재시도함
-                    await authPatch("http://localhost:8080/api/notice/read-all");
-                    console.log("✅ 전체 알림 읽음 처리 성공");
-
-                    setNotifications((prev) =>
-                      prev.map((n) => ({ ...n, isRead: true }))
-                    );
-                    setUnreadCount(0);
-                  } catch (error) {
-                    console.error("❌ 전체 알림 읽음 처리 실패:", error.message);
-                  }
+                  await markAllAsRead();
                 }}
                 className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium"
               >

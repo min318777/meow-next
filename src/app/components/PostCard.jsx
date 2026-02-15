@@ -104,7 +104,7 @@ const PostCard = ({ post, onLike, basePath = "/boast" }) => {
         <span>·</span>
         <span>좋아요 {post.likes || 0}</span>
         <span>·</span>
-        <span>댓글 {post.commentDtoList?.length || 0}</span>
+        <span>댓글 {post.commentCount ?? post.commentDtoList?.length ?? 0}</span>
       </div>
     </div>
   );

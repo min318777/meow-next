@@ -505,7 +505,7 @@ export default function BoastDetailPage() {
                   <>
                     {currentComments.map((comment, index) => {
                       const commentContent = comment.contents || '';
-                      const commentWriter = comment.writer || '익명';
+                      const commentWriter = comment.loginId || comment.writer || '익명';
                       const commentDate = comment.createdAt;
 
                       // 날짜 포맷: YYYY년 MM월 DD일 HH:mm
@@ -529,7 +529,7 @@ export default function BoastDetailPage() {
                             <span className="mx-2 text-gray-300">|</span>
                             <span className="text-gray-400">{formattedDate}</span>
                             {/* 본인 댓글일 경우 수정/삭제 */}
-                            {currentLoginId && commentWriter === currentLoginId && (
+                            {currentLoginId && (comment.loginId === currentLoginId || comment.writer === currentLoginId) && (
                               <>
                                 <span className="mx-2 text-gray-300">|</span>
                                 <button

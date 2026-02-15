@@ -4,6 +4,7 @@ import { Search, User, Menu, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
 import NotificationDropdown from "./NotificationDropdown";
+import { useNotification } from "../contexts/NotificationContext";
 
 /**
  * 헤더 컴포넌트
@@ -27,20 +28,19 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
       const [isLoggedIn, setIsLoggedIn] = useState(false);
       // displayName: UI에 표시할 사용자 이름 (loginId)
       const [displayName, setDisplayName] = useState('');
-      // userId: API 요청에 사용할 사용자 ID (숫자)
-      const [userId, setUserId] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+      // 알림 Context 사용
+      const { initializeNotifications, cleanupNotifications } = useNotification();
 
       useEffect(() => {
         // localStorage에서 인증 정보 확인
         const token = localStorage.getItem('accessToken');
         const loginId = localStorage.getItem('loginId');
-        const storedUserId = localStorage.getItem('userId');
 
         if (token && loginId) {
           setIsLoggedIn(true);
           setDisplayName(loginId); // UI 표시용
-          setUserId(storedUserId || ''); // API 요청용
         }
       }, []);
 
@@ -78,6 +78,8 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
         } finally {
           // 서버 요청 결과와 관계없이 클라이언트 측 로그아웃 처리
           setIsLoggedIn(false);
+          // 알림 시스템 정리 (SSE 연결 종료)
+          cleanupNotifications();
           // 모든 인증 관련 localStorage 데이터 삭제
           localStorage.removeItem("accessToken");
           localStorage.removeItem("userId");
@@ -133,8 +135,8 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
           <div className="hidden md:flex items-center space-x-4">
             {isLoggedIn ? (
               <div className="flex items-center space-x-4">
-                {/* 알림 아이콘 - userId(숫자)를 전달하여 API 호출에 사용 */}
-                <NotificationDropdown userId={userId} />
+                {/* 알림 아이콘 - Context에서 상태 관리 */}
+                <NotificationDropdown />
 
                 <button
                   onClick={() => router.push("/mypage")}
@@ -228,7 +230,7 @@ const Header = ({ isMenuOpen, setIsMenuOpen }) => {
                   </button>
                   <div className="flex items-center space-x-2">
                     {/* 모바일 알림 아이콘 */}
-                    <NotificationDropdown userId={userId} />
+                    <NotificationDropdown />
                     <button
                       onClick={handleLogout}
                       className="text-gray-600 hover:text-gray-800 transition-colors">

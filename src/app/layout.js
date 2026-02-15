@@ -1,4 +1,5 @@
 import './globals.css';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 export const metadata = {
   title: 'meow',
@@ -8,7 +9,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        <NotificationProvider>
+          {children}
+        </NotificationProvider>
+      </body>
     </html>
   );
 }
